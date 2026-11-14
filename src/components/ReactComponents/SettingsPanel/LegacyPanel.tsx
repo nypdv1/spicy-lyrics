@@ -10,15 +10,9 @@ import SourcesSection from "./SourcesSection.tsx";
 import Footer from "./Footer.tsx";
 import { SearchBar, ShowHiddenSettingsInSearchContext } from "./components.tsx";
 import { AdvancedIcon, AppearanceIcon, ExperimentsIcon, InterfaceIcon, LyricsIcon, SourcesIcon } from "./icons.tsx";
+import { SETTINGS_CATEGORIES } from "./settingsCatalog.ts";
 
-const TABS = [
-  ["Appearance", "Appearance", AppearanceIcon],
-  ["Lyrics", "Lyrics Display", LyricsIcon],
-  ["Effects", "Effects", ExperimentsIcon],
-  ["Interface", "Interface", InterfaceIcon],
-  ["Sources", "Sources", SourcesIcon],
-  ["Advanced", "Advanced", AdvancedIcon],
-] as const;
+const TABS = SETTINGS_CATEGORIES.map((category) => [category.label, category.classicLabel, category.icon] as const);
 
 export type SettingsPanelState = { query: string; sectionFilter: string; scrollTop: number };
 export default function SettingsPanel({ onOpenHiddenSettings, onOpenPane, onManageAnimator, initialState, onStateChange }: { onOpenHiddenSettings?: () => void; onOpenPane?: (pane: SettingsSubPane) => void; onManageAnimator?: (state: SettingsPanelState) => void; initialState?: SettingsPanelState; onStateChange?: (state: SettingsPanelState) => void }) {

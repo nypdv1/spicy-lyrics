@@ -375,17 +375,6 @@ sl-generic-modal.SpicyLyricsModal .sl-modal-overlay:has(.sl-us) {
     scrollbar-width: none;
   }
 
-  /* The bar itself stays transparent; only the rows passing underneath soften away. */
-  .sl-us-subnav::before {
-    content: "";
-    position: absolute;
-    z-index: 0;
-    inset: 0 -8px -18px;
-    pointer-events: none;
-    background: linear-gradient(to bottom, color-mix(in oklab, var(--sl-us-field-deep, #141414) 28%, transparent), transparent);
-  }
-
-  .sl-us-subnav > button { position: relative; z-index: 1; }
 
   .sl-us-subnav::-webkit-scrollbar { display: none; }
   .sl-us-subnav button {

@@ -1508,10 +1508,7 @@ let autoChangingNowBar = false;
 function songHasMovingArtwork(): boolean | "pending" {
   // Only the live Spicy Themes signal claims the NowBar. MusicVideoStage can remain
   // briefly during handoff, but must not keep the NowBar open after playback ends.
-  if ($musicVideoOnStage.get() && (
-    PageContainer?.classList.contains("st-mv-active") ||
-    PageContainer?.querySelector("#spicy-themes-mv")
-  )) return true;
+  if ($musicVideoOnStage.get() && PageContainer?.querySelector("#spicy-themes-mv")?.firstElementChild) return true;
   // A Canvas plays on the stage, which needs the dynamic background.
   if (isExperimentEnabled("canvasImmersive") && ["dynamic", "none"].includes($backgroundStyle.get()) && GetPlayingCanvasInfo()) {
     return true;
@@ -1528,7 +1525,7 @@ function SyncAutoNowBar() {
   const eligible =
     !!page &&
     $nowBarForMovingArtwork.get() &&
-    !$isNowBarOpen.get() &&
+    (!$isNowBarOpen.get() || autoShown) &&
     !Fullscreen.IsOpen &&
     !IsPIP &&
     !IsCardMode;

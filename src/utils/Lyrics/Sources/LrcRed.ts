@@ -57,6 +57,75 @@ const isModelSynced = (ttml: string): boolean => /<tt\b[^>]*\blrc:byModel\s*=\s*
 const MODEL_SYNC_MIN_FINAL_WORD_DURATION = 0.15;
 const MODEL_SYNC_SHORT_FINAL_WORD_DURATION = 0.1;
 
+function addLeadPiece(lead: any[], syllable: any, rawText: string): void {
+  let text = rawText.trim();
+  if (!text) return;
+  const leadingPunctuation = text.match(/^[,.;:!?]+/);
+  if (leadingPunctuation && lead.length > 0) {
+    lead[lead.length - 1].Text += leadingPunctuation[0];
+    text = text.slice(leadingPunctuation[0].length).trim();
+    if (!text) return;
+  }
+  lead.push({ ...syllable, Text: text, IsPartOfWord: rawText === syllable.Text ? syllable.IsPartOfWord : false });
+}
+
+function addBackgroundPiece(pieces: any[], syllable: any, rawText: string): void {
+  // Brackets and punctuation belong to the main line's grammar, not the ad-lib.
+  const text = rawText.replace(/^[\s([{]+|[\s\])}.,;:!?]+$/g, "");
+  if (text) pieces.push({ ...syllable, Text: text, IsPartOfWord: false });
+}
+
+/** Moves every parenthetical model-sync ad-lib into its own background vocal group. */
+function moveModelSyncedParentheticalsToBackground(lyrics: any): void {
+  if (lyrics?.Type !== "Syllable" || !Array.isArray(lyrics.Content)) return;
+
+  for (const vocal of lyrics.Content) {
+    const original = vocal?.Lead?.Syllables;
+    if (!Array.isArray(original) || original.length === 0) continue;
+
+    const lead: any[] = [];
+    const backgrounds: any[] = [];
+    let backgroundPieces: any[] | null = null;
+
+    for (const syllable of original) {
+      let remaining = typeof syllable?.Text === "string" ? syllable.Text : "";
+      while (remaining) {
+        if (backgroundPieces) {
+          const close = remaining.indexOf(")");
+          addBackgroundPiece(backgroundPieces, syllable, close >= 0 ? remaining.slice(0, close) : remaining);
+          if (close < 0) break;
+          if (backgroundPieces.length > 0) {
+            backgrounds.push({
+              StartTime: backgroundPieces[0].StartTime,
+              EndTime: backgroundPieces[backgroundPieces.length - 1].EndTime,
+              Syllables: backgroundPieces,
+            });
+          }
+          backgroundPieces = null;
+          remaining = remaining.slice(close + 1);
+          continue;
+        }
+
+        const open = remaining.indexOf("(");
+        if (open < 0) {
+          addLeadPiece(lead, syllable, remaining);
+          break;
+        }
+        addLeadPiece(lead, syllable, remaining.slice(0, open));
+        backgroundPieces = [];
+        remaining = remaining.slice(open + 1);
+      }
+    }
+
+    // Don't leave a line without lead text if the model supplied only an ad-lib.
+    if (backgrounds.length === 0 || lead.length === 0 || backgroundPieces) continue;
+    vocal.Lead.Syllables = lead;
+    vocal.Lead.StartTime = lead[0].StartTime;
+    vocal.Lead.EndTime = lead[lead.length - 1].EndTime;
+    vocal.Background = [...(Array.isArray(vocal.Background) ? vocal.Background : []), ...backgrounds];
+  }
+}
+
 /**
  * lrc.red's model occasionally gives a line's final word an almost zero-length
  * window. Keep the word as one unit (it may be split across several syllables)
@@ -90,7 +159,10 @@ export function LyricsFromLrcRedTTML(ttml: string): any | null {
   const parsed = parseTTMLToLyrics(ttml);
   if (!parsed?.Type) return null;
   const byModel = isModelSynced(ttml);
-  if (byModel) fixShortModelSyncedLineEndings(parsed);
+  if (byModel) {
+    moveModelSyncedParentheticalsToBackground(parsed);
+    fixShortModelSyncedLineEndings(parsed);
+  }
   return createProviderResult(
     {
       ...parsed,

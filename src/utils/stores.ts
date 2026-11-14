@@ -353,6 +353,8 @@ export const $lrcRedAcceptModelSynced = persistAtom<boolean>("lrcRedAcceptModelS
 export const $playbackOffset = persistAtom<number>("playbackOffset", 0);
 export const $allowHidingSettings = persistAtom<boolean>("allowHidingSettings", false);
 export const $hideHidingIcon = persistAtom<boolean>("hideHidingIcon", false);
+// The upstream 6.5 settings panel can be enabled without removing this fork's classic layout.
+export const $useUpstreamSettingsLayout = persistAtom<boolean>("useUpstreamSettingsLayout", false);
 const initialHiddenSettingIds = Array.isArray(_settings.hiddenSettingIds)
   ? _settings.hiddenSettingIds.filter((id): id is string => typeof id === "string" && SETTING_IDS.has(id))
   : [];

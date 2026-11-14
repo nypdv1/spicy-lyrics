@@ -12,6 +12,7 @@ import {
   $staticBackgroundMode,
   $hiddenSettingIds,
   $pinnedFooterMode,
+  $useUpstreamSettingsLayout,
 } from "../../../utils/stores.ts";
 import { matches, Row, SectionTitle, Select, Slider, Toggle } from "./components.tsx";
 import { ExperimentSettings } from "./ExperimentsPanel.tsx";
@@ -49,6 +50,7 @@ export default function AppearanceSection({ query, sectionFilter, showHidden = f
   const hiddenSettingIds = useStore($hiddenSettingIds);
   const fpsCapEnabled = useStore($animationFpsCapEnabled);
   const fpsCap = useStore($animationFpsCap);
+  const useUpstreamSettingsLayout = useStore($useUpstreamSettingsLayout);
 
   if (sectionFilter !== "All" && sectionFilter !== SECTION_NAME) return null;
 
@@ -64,8 +66,9 @@ export default function AppearanceSection({ query, sectionFilter, showHidden = f
   const r9 = visible("appearance-fps-limit") && matches(query, "Limit Animation Frame Rate", FPS_CAP_DESCRIPTION);
   const r10 = visible("appearance-fps-cap") && fpsCapEnabled && matches(query, "Animation Frame Rate", FPS_SLIDER_DESCRIPTION);
   const newDesign = visible("appearance-settings-design") && matches(query, "New Settings and Update Design", "Use the lavender design for settings, update dialogs, and notifications. Disable for classic neutral styling.");
+  const upstreamLayout = visible("appearance-upstream-layout") && matches(query, "Use New Settings Layout", "Switch to the updated upstream settings layout. Your current settings remain unchanged and you can switch back at any time.");
 
-  if (!r1 && !r2 && !r3 && !r4 && !r6 && !r7 && !r8 && !r9 && !r10 && !newDesign) return null;
+  if (!r1 && !r2 && !r3 && !r4 && !r6 && !r7 && !r8 && !r9 && !r10 && !newDesign && !upstreamLayout) return null;
 
   return (
     <>
@@ -111,6 +114,11 @@ export default function AppearanceSection({ query, sectionFilter, showHidden = f
       )}
       {r8 && <ExperimentSettings experimentIds={["newProgressBarStyling"]} showBuiltIn={false} />}
       {newDesign && <ExperimentSettings experimentIds={["newSettingsDesign"]} showBuiltIn={false} />}
+      {upstreamLayout && (
+        <Row settingId="appearance-upstream-layout" label="Use New Settings Layout" description="Switch to the updated upstream settings layout. Your current settings remain unchanged and you can switch back at any time.">
+          <Toggle checked={useUpstreamSettingsLayout} onChange={(value) => $useUpstreamSettingsLayout.set(value)} />
+        </Row>
+      )}
 
       {r9 && (
         <Row settingId="appearance-fps-limit" label="Limit Animation Frame Rate" description={FPS_CAP_DESCRIPTION}>

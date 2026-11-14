@@ -142,6 +142,7 @@ export default function SettingsPanel() {
     []
   );
   const rootRef = useRef<HTMLDivElement>(null);
+  const groupRefs = useRef(new Map<string, HTMLDetailsElement>());
 
   const searchRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -408,8 +409,24 @@ export default function SettingsPanel() {
                 {/* Experiment rows are all held at once, so the tab says it once, not per row. */}
                 {section.id === "experiments" && reviewerOn && <p className="sl-us-intro">{REVIEWER_LOCK_REASON}</p>}
                 {hasRows ? (
-                  groups.map((group, i) => group.title ? (
-                    <details className="sl-us-group sl-us-group--collapsible" key={group.title} open={i === 0}>
+                  <>
+                    {groups.filter((group) => group.title).length > 1 && (
+                      <nav className="sl-us-subnav" aria-label={`${section.title} subcategories`}>
+                        {groups.filter((group) => group.title).map((group) => (
+                          <button key={group.title} type="button" onClick={() => {
+                            const target = groupRefs.current.get(group.title!);
+                            if (!target) return;
+                            target.open = true;
+                            target.scrollIntoView({ behavior: "smooth", block: "start" });
+                          }}>{group.title}</button>
+                        ))}
+                      </nav>
+                    )}
+                    {groups.map((group, i) => group.title ? (
+                    <details ref={(element) => {
+                      if (element) groupRefs.current.set(group.title!, element);
+                      else groupRefs.current.delete(group.title!);
+                    }} className="sl-us-group sl-us-group--collapsible" key={group.title} open>
                       <summary className="sl-us-group-title">
                         <span>{group.title}</span>
                         <span className="sl-us-group-chevron" aria-hidden="true">{ChevronIcon}</span>
@@ -424,7 +441,8 @@ export default function SettingsPanel() {
                         {group.settings.map((def) => <SettingRow key={def.id} def={def} query="" />)}
                       </div>
                     </div>
-                  ))
+                    ))}
+                  </>
                 ) : (
                   <div className="sl-us-empty">
                     <p className="sl-us-empty-title">{section.emptyText ?? "Nothing here yet."}</p>

@@ -31,6 +31,13 @@
   opacity: 0;
 }
 
+/* With Background Type set to None, the stage is the only artwork surface. Its existing
+   masks therefore feather the media directly into the transparent page instead of a Kawarp
+   backdrop; the blurred ambient layer would otherwise paint an opaque full-page rectangle. */
+#SpicyLyricsPage.CanvasStageTransparent .ContentBox > :is(.CanvasAmbient, canvas.spicy-dynamic-bg) {
+  opacity: 0 !important;
+}
+
 /* Stage: the NowBar's side of the page, edge to edge, feathered only where it meets the lyrics.
    A sibling of the NowBar, so the NowBar width vars resolve against the same container. */
 #SpicyLyricsPage .ContentBox > .CanvasStage {
@@ -588,4 +595,8 @@
 /* Its blurred copies are laid out for the whole page; the stage has its own feather instead. */
 #SpicyLyricsPage.MusicVideoStage.st-mv-active #spicy-themes-mv .st-mv-fx {
   display: none !important;
+}
+
+#SpicyLyricsPage.CanvasStageTransparent.MusicVideoStage.st-mv-active .ContentBox > canvas.spicy-dynamic-bg {
+  opacity: 0 !important;
 }

@@ -25,6 +25,7 @@ import {
 const immersiveLogger = new Logger("Canvas Immersive");
 
 const ACTIVE_CLASS = "CanvasImmersive";
+const TRANSPARENT_STAGE_CLASS = "CanvasStageTransparent";
 // A Spicy Themes music video is on the stage (CanvasImmersive.css).
 const MUSIC_VIDEO_CLASS = "MusicVideoStage";
 // Spicy Themes briefly clears st-mv-active while its player reloads or buffers.
@@ -53,6 +54,11 @@ const THEME_BACKGROUND_CLASSES = ["st-bgimg-active", "st-animbg-solid", "st-mv-a
 
 const themeOwnsBackground = (page: HTMLElement): boolean =>
   THEME_BACKGROUND_CLASSES.some((cls) => page.classList.contains(cls));
+
+const supportsCanvasStage = () => {
+  const style = getBackgroundStyle();
+  return style === "dynamic" || style === "none";
+};
 
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
@@ -338,7 +344,7 @@ function Unmount() {
   mount.stopFrames();
   mount.stopVisibility();
   for (const layer of mount.layers) releaseLayer(layer);
-  mount.page.classList.remove(ACTIVE_CLASS);
+  mount.page.classList.remove(ACTIVE_CLASS, TRANSPARENT_STAGE_CLASS);
   releaseMusicVideo(mount.page);
   mount.ambient.remove();
   mount.stage.remove();
@@ -453,6 +459,7 @@ function toggleDockLayout(m: Mount, on: boolean) {
     .some((a) => a instanceof CSSTransition && a.transitionProperty === "left");
   if (!sliding) m.nowBar.style.transition = "none";
   m.page.classList.toggle(ACTIVE_CLASS, on);
+  m.page.classList.toggle(TRANSPARENT_STAGE_CLASS, on && getBackgroundStyle() === "none");
   if (on) updateSquareTop(m);
   const afterRects = rows.map(rowPlace);
   if (!sliding) {
@@ -583,7 +590,7 @@ function isEligible(): boolean {
     !IsCardMode &&
     !IsPIP &&
     !IsCompactMode() &&
-    getBackgroundStyle() === "dynamic" &&
+    supportsCanvasStage() &&
     !themeOwnsBackground(PageContainer)
   );
 }
@@ -632,7 +639,7 @@ function musicVideoStageEligible(page: HTMLElement): boolean {
     !IsCardMode &&
     !IsPIP &&
     !IsCompactMode() &&
-    getBackgroundStyle() === "dynamic"
+    supportsCanvasStage()
   );
 }
 
@@ -902,7 +909,12 @@ Global.Event.listen("nowbar:close", () => void Refresh());
 onExperimentChange((experiment) => {
   if (experiment.id === "canvasImmersive") void Refresh();
 });
-$backgroundStyle.listen(() => void Refresh());
+$backgroundStyle.listen(() => {
+  if (mount && (active || musicVideoStaged)) {
+    mount.page.classList.toggle(TRANSPARENT_STAGE_CLASS, getBackgroundStyle() === "none");
+  }
+  void Refresh();
+});
 Global.Event.listen("motion-artwork:verdict", () => void Refresh());
 $musicVideoOnStage.listen(() => void Refresh());
 for (const store of [$motionArtwork, $motionArtworkPriority, $motionArtworkOnStage]) store.listen(() => void Refresh());

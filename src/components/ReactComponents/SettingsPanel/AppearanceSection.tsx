@@ -27,8 +27,8 @@ export const backgroundModeLabel = (mode: string): string => bgModeLabels[bgMode
 
 /** Why the Canvas Stage can't show with this Background Type, or false when it can. */
 export function canvasStageBackgroundNote(mode: string): string | false {
-  const dynamic = mode === "default" || mode === "off";
-  return !dynamic && `Not showing: Background Type is ${backgroundModeLabel(mode)}. Canvas Stage only plays with the Default background (Appearance).`;
+  const supported = mode === "default" || mode === "off" || mode === "none";
+  return !supported && `Not showing: Background Type is ${backgroundModeLabel(mode)}. Canvas Stage works with the Default or None (Transparent) background (Appearance).`;
 }
 
 interface Props {
@@ -72,7 +72,7 @@ export default function AppearanceSection({ query, sectionFilter, showHidden = f
       <SectionTitle>Appearance</SectionTitle>
 
       {r3 && (
-        <Row settingId="appearance-background-type" label="Background Type" description="Choose the dynamic, legacy, static image, or color background." note={canvasStageEnabled && canvasStageBackgroundNote(staticBackgroundMode) && "Canvas Stage doesn't play with this background: songs with a Canvas show the cover instead. Pick Default to see it."}>
+        <Row settingId="appearance-background-type" label="Background Type" description="Choose the dynamic, legacy, static image, or color background." note={canvasStageEnabled && canvasStageBackgroundNote(staticBackgroundMode) && "Canvas Stage doesn't play with this background: songs with a Canvas show the cover instead. Pick Default or None (Transparent) to see it."}>
           <Select
             value={staticBackgroundMode === "off" ? "default" : staticBackgroundMode}
             options={bgModeOptions}

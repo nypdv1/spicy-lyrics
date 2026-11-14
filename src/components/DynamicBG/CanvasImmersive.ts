@@ -861,6 +861,10 @@ function syncMusicVideoStage(m: Mount): boolean {
       releaseMusicVideo(m.page);
       if (!active) toggleDockLayout(m, false);
       notifyCoverClaim();
+      // The video slots were intentionally removed while Spicy Themes owned
+      // the stage. Re-run source selection now that the grace period ended so
+      // Canvas or motion artwork can attach one again.
+      void Refresh();
     }, MUSIC_VIDEO_INACTIVE_GRACE_MS);
   } else if (!eligible) {
     clearMusicVideoReleaseTimer();

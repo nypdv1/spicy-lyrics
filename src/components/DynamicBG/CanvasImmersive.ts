@@ -1,5 +1,5 @@
 import "../../css/CanvasImmersive.css";
-import { $backgroundStyle, $motionArtworkOnStage, $motionArtworkPriority, $motionArtwork, $musicVideoOnStage } from "../../utils/stores.ts";
+import { $backgroundStyle, $developerMode, $motionArtworkOnStage, $motionArtworkPriority, $motionArtwork, $musicVideoOnStage } from "../../utils/stores.ts";
 import { isExperimentEnabled, onExperimentChange } from "../../utils/experiments.ts";
 import { onAnimationFrame } from "../../utils/AnimationFrameLoop.ts";
 import Logger from "../../utils/Logger.ts";
@@ -642,12 +642,65 @@ function syncPlayback() {
 let musicVideoStaged = false;
 let musicVideoReleaseTimer: ReturnType<typeof setTimeout> | null = null;
 let lastMusicVideoTrace = "";
+let musicVideoRemovalTracingInstalled = false;
 
 // The player is the authoritative live signal. The theme class can be missing,
 // stale, or cleared during a player transition, and must never own the stage by itself.
 function hasLiveMusicVideo(page: HTMLElement): boolean {
   return !!page.querySelector("#spicy-themes-mv");
 }
+
+function nodeIncludesMusicVideo(node: Node | null): boolean {
+  return node instanceof Element && (node.id === "spicy-themes-mv" || !!node.querySelector("#spicy-themes-mv"));
+}
+
+function traceMusicVideoRemoval(operation: string, target: Node, removed?: Node): void {
+  if (!$developerMode.get()) return;
+  console.trace("[Spicy Lyrics] Music video removal", {
+    operation,
+    target,
+    removed,
+    track: playingTrackUri(),
+  });
+}
+
+// MutationObserver reports a removal after the caller is gone from the stack. In developer
+// mode, wrap the DOM removal entry points just long enough to preserve that real caller stack.
+function installMusicVideoRemovalTracing(): void {
+  if (musicVideoRemovalTracingInstalled) return;
+  musicVideoRemovalTracingInstalled = true;
+
+  const nativeRemoveChild = Node.prototype.removeChild;
+  Node.prototype.removeChild = function (child: Node): Node {
+    if (nodeIncludesMusicVideo(child)) traceMusicVideoRemoval("removeChild", this, child);
+    return nativeRemoveChild.call(this, child);
+  };
+
+  const nativeRemove = Element.prototype.remove;
+  Element.prototype.remove = function (): void {
+    if (nodeIncludesMusicVideo(this)) traceMusicVideoRemoval("remove", this.parentNode ?? this, this);
+    nativeRemove.call(this);
+  };
+
+  const nativeReplaceChildren = Element.prototype.replaceChildren;
+  Element.prototype.replaceChildren = function (...nodes: (Node | string)[]): void {
+    if (nodeIncludesMusicVideo(this)) traceMusicVideoRemoval("replaceChildren", this);
+    nativeReplaceChildren.apply(this, nodes);
+  };
+
+  const innerHTML = Object.getOwnPropertyDescriptor(Element.prototype, "innerHTML");
+  if (innerHTML?.get && innerHTML.set) {
+    Object.defineProperty(Element.prototype, "innerHTML", {
+      ...innerHTML,
+      set(this: Element, value: string) {
+        if (nodeIncludesMusicVideo(this)) traceMusicVideoRemoval("innerHTML", this);
+        innerHTML.set!.call(this, value);
+      },
+    });
+  }
+}
+
+installMusicVideoRemovalTracing();
 
 function traceMusicVideo(reason: string, page: HTMLElement): void {
   const state = {

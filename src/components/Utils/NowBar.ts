@@ -1742,7 +1742,10 @@ function UpdateNowBar(force = false) {
   //const MediaBox = NowBar.querySelector(".Header .MediaBox");
   //const SongName = NowBar.querySelector(".Header .Metadata .SongName");
 
-  if (!$isNowBarOpen.get() && !force) return;
+  // Whether it's showing, not the saved setting: NowBar for Canvas and Motion Artwork shows it
+  // with the setting off, and its title and artists still have to follow the song.
+  const nowBarShown = $isNowBarOpen.get() || !!PageContainer?.classList.contains("NowBarStatus__Open");
+  if (!nowBarShown && !force) return;
 
   // Started now so the year is often known by the time the metadata swaps in.
   const releaseYearQuery =

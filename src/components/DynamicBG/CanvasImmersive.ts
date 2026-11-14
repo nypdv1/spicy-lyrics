@@ -817,7 +817,11 @@ function syncMusicVideoStage(m: Mount): boolean {
     musicVideoStaged = want;
     if (want) {
       // Our own Canvas or motion artwork gives the stage up.
-      if (active) deactivate();
+      // Spicy Themes treats any other <video> in the lyrics page as Spotify's
+      // official music video. Do not leave our outgoing Canvas/motion frame in
+      // the DOM for its fade: that makes it tear down its own player for this track.
+      if (active) deactivate(true);
+      else for (const layer of m.layers) releaseLayer(layer);
       m.page.classList.add(MUSIC_VIDEO_CLASS);
       toggleDockLayout(m, true);
       traceMusicVideo("stage claimed", m.page);
@@ -868,7 +872,7 @@ function activate() {
   notifyCoverClaim();
 }
 
-function deactivate() {
+function deactivate(immediate = false) {
   if (!mount || !active) return;
   finishSideSwap();
   active = false;
@@ -877,8 +881,12 @@ function deactivate() {
   toggleDockLayout(mount, false);
   notifyCoverClaim();
 
-  const gen = generation;
   const m = mount;
+  if (immediate) {
+    for (const layer of m.layers) releaseLayer(layer);
+    return;
+  }
+  const gen = generation;
   setTimeout(() => {
     if (gen !== generation || active || mount !== m) return;
     for (const layer of m.layers) releaseLayer(layer);

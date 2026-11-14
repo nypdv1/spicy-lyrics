@@ -1739,6 +1739,13 @@ export function Animate(position: number): void {
               word.AnimatorStore.YOffset.SetGoal(YOffsetSpline.at(0), true);
               word.AnimatorStore.Glow.SetGoal(GlowSpline.at(0), true);
               word.HTMLElement.style.setProperty("--gradient-position", "-20%");
+              // Simple Lyrics uses a CSS animation instead of the spring for
+              // its wipe. Its one-shot flags must reset too, otherwise only
+              // the first syllable in a stutter ever plays the animation.
+              word.SLMAnimated = false;
+              word.PreSLMAnimated = false;
+              word.HTMLElement.style.animation = "none";
+              word.HTMLElement.style.setProperty("--SLM_GradientPosition", "-50%");
             }
 
             if (wordState === "Active") {

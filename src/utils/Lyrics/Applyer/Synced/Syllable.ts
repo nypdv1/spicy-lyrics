@@ -148,7 +148,10 @@ function repairVocalStutters(syllables: SyllableData[]): SyllableData[] {
   const dashOnly = /^\s*[-\u2010-\u2015]\s*$/u;
   const dashAtStart = /^\s*[-\u2010-\u2015]\s*/u;
   const lettersOnly = (text: string) => text.normalize("NFKD").replace(/[^\p{L}\p{N}]/gu, "").toLocaleLowerCase();
-  const matches: Array<{ prefixStart: number; prefixEnd: number; targetStart: number; targetEnd: number }> = [];
+  const matches: Array<{
+    prefixStart: number; prefixEnd: number; targetStart: number; targetEnd: number;
+    displayStart: number; displayEnd: number;
+  }> = [];
 
   for (let index = 0; index < repaired.length - 1; index++) {
     const current = repaired[index];
@@ -175,6 +178,7 @@ function repairVocalStutters(syllables: SyllableData[]): SyllableData[] {
     const nextText = (target.Text ?? "").replace(dashAtStart, "").trimStart();
     let repeatsPrefix = !!prefix && lettersOnly(nextText).startsWith(prefix);
     let phraseLength = 1;
+    let suffixStutter = false;
     // A stutter can repeat a whole phrase, while the dash is only carried by
     // its final timed word: `Wake` + `up—`, `wake` + `up—`, `wake` + `up`.
     // Find the shortest repeated token sequence ending in that dashed word.
@@ -201,6 +205,25 @@ function repairVocalStutters(syllables: SyllableData[]): SyllableData[] {
         }
       }
     }
+    // A shortened repeat can be the tail of the word instead: `mis` +
+    // `sile`, `-ile`. The visible word remains `missile`, replaying when its
+    // final `ile` is stuttered. Walk the authored word back before comparing
+    // so timed syllables are treated as one spelling.
+    let suffixStart = index;
+    if (!repeatsPrefix && movesDashToCurrent) {
+      while (suffixStart > 0 && repaired[suffixStart - 1].IsPartOfWord) suffixStart--;
+      const fullPrefix = repaired
+        .slice(suffixStart, index + 1)
+        .map((part, partIndex) =>
+          lettersOnly(partIndex === index - suffixStart ? prefixText.replace(dashAtEnd, "") : part.Text ?? "")
+        )
+        .join("");
+      const suffix = lettersOnly(nextText);
+      if (suffix && fullPrefix.length > suffix.length && fullPrefix.endsWith(suffix)) {
+        repeatsPrefix = true;
+        suffixStutter = true;
+      }
+    }
     // Only repair repeated starts (te- test), never an ordinary hyphenated
     // compound such as "well- known".
     if (!repeatsPrefix) continue;
@@ -210,10 +233,12 @@ function repairVocalStutters(syllables: SyllableData[]): SyllableData[] {
     for (let separator = index + 1; separator < targetIndex; separator++) repaired[separator].IsPartOfWord = true;
     if (nextText !== target.Text) target.Text = nextText;
     matches.push({
-      prefixStart: index - phraseLength + 1,
+      prefixStart: suffixStutter ? suffixStart : index - phraseLength + 1,
       prefixEnd: index,
       targetStart: targetIndex,
       targetEnd: targetIndex + phraseLength - 1,
+      displayStart: suffixStutter ? suffixStart : targetIndex,
+      displayEnd: suffixStutter ? index : targetIndex + phraseLength - 1,
     });
   }
   return collapseVocalStutters(repaired, matches);
@@ -224,7 +249,10 @@ function repairVocalStutters(syllables: SyllableData[]): SyllableData[] {
 // vocal restart instead of showing three independently animated fragments.
 function collapseVocalStutters(
   syllables: SyllableData[],
-  matches: Array<{ prefixStart: number; prefixEnd: number; targetStart: number; targetEnd: number }>
+  matches: Array<{
+    prefixStart: number; prefixEnd: number; targetStart: number; targetEnd: number;
+    displayStart: number; displayEnd: number;
+  }>
 ): SyllableData[] {
   if (matches.length === 0) return syllables;
   const groups: Array<typeof matches> = [];
@@ -246,12 +274,12 @@ function collapseVocalStutters(
 
     const lastMatch = group[group.length - 1];
     const last = lastMatch.targetEnd;
-    const display = syllables.slice(lastMatch.targetStart, last + 1);
+    const display = syllables.slice(lastMatch.displayStart, lastMatch.displayEnd + 1);
     const final = display[display.length - 1];
     const joinPhraseText = (pick: (part: SyllableData) => string) =>
       display.reduce(
         (joined, part, partIndex) =>
-          `${joined}${partIndex > 0 && !display[partIndex - 1].IsPartOfWord ? " " : ""}${pick(part)}`,
+          `${joined}${partIndex > 0 && !display[partIndex - 1].IsPartOfWord ? " " : ""}${pick(part).replace(/[-\u2010-\u2015]\s*$/u, "")}`,
         ""
       );
     const text = joinPhraseText((part) => part.Text ?? "");

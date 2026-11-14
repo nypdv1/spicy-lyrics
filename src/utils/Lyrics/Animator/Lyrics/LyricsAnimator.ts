@@ -1707,6 +1707,7 @@ export function Animate(position: number): void {
           const percentage = restartRange || !hasRestartRanges
             ? getProgressPercentage(ProcessedPosition, timingStart, timingEnd)
             : wordState === "Sung" ? 1 : 0;
+          const wordDuration = timingEnd - timingStart;
           const sweepSpan = sweep?.Spans[wordIndex];
 
           const isLetterGroup = word?.LetterGroup;
@@ -1832,7 +1833,7 @@ export function Animate(position: number): void {
                       if (!nextWord.PreSLMAnimated) {
                         nextWord.PreSLMAnimated = true;
                         nextWord.HTMLElement.style.removeProperty("--SLM_GradientPosition");
-                        const delay = Math.max(0, word.StartTime + totalDuration * 0.845 - 130 - ProcessedPosition);
+                        const delay = Math.max(0, timingStart + wordDuration * 0.845 - 130 - ProcessedPosition);
                         nextWord.HTMLElement.style.animation = getPreSLMAnimation(250, delay);
                       }
                     }
@@ -1851,7 +1852,7 @@ export function Animate(position: number): void {
                   } else {
                     word.HTMLElement.style.removeProperty("--SLM_GradientPosition");
                     //word.HTMLElement.style.removeProperty("--SLM_TranslateY");
-                    word.HTMLElement.style.animation = getSLMAnimation(totalDuration, ProcessedPosition - word.StartTime);
+                    word.HTMLElement.style.animation = getSLMAnimation(wordDuration, ProcessedPosition - timingStart);
                     word.SLMAnimated = true;
                     word.PreSLMAnimated = false;
                     const nextWord = words[wordIndex + 1];
@@ -1859,7 +1860,7 @@ export function Animate(position: number): void {
                       if (!nextWord.PreSLMAnimated) {
                         nextWord.PreSLMAnimated = true;
                         nextWord.HTMLElement.style.removeProperty("--SLM_GradientPosition");
-                        const delay = Math.max(0, word.StartTime + totalDuration * 0.6 - 22 - ProcessedPosition);
+                        const delay = Math.max(0, timingStart + wordDuration * 0.6 - 22 - ProcessedPosition);
                         nextWord.HTMLElement.style.animation = getPreSLMAnimation(125, delay);
                       }
                     }

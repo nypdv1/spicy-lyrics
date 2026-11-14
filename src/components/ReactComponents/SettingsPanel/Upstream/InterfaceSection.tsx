@@ -10,7 +10,6 @@ import {
   $motionArtwork,
   $motionArtworkOnStage,
   $motionArtworkPriority,
-  $musicVideoOnStage,
   $nowBarForMovingArtwork,
   $popupLyricsAllowed,
   $releaseYearPosition,
@@ -154,16 +153,6 @@ const groups: GroupDef[] = [
   {
     title: "Album Artwork",
     settings: [
-      {
-        id: "musicVideoOnStage",
-        label: "Spicy Themes Music Videos on Canvas Stage",
-        description: "Show a Spicy Themes music video in the Canvas Stage beside the lyrics instead of behind them.",
-        keywords: "spicy themes music video mv canvas stage",
-        useDisabled: () => !useStore($experiment("canvasImmersive")) && `Turn on ${getExperiment("canvasImmersive").label} in Experiments to change this.`,
-        Control: ({ disabled, label }) => (
-          <Toggle label={label} checked={useStore($musicVideoOnStage)} onChange={(v) => $musicVideoOnStage.set(v)} disabled={disabled} />
-        ),
-      },
       {
         id: "nowBarForMovingArtwork",
         label: "NowBar for Canvas and Motion Artwork",

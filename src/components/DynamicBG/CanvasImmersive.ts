@@ -1,5 +1,5 @@
 import "../../css/CanvasImmersive.css";
-import { $backgroundStyle, $developerMode, $motionArtworkOnStage, $motionArtworkPriority, $motionArtwork, $musicVideoOnStage } from "../../utils/stores.ts";
+import { $backgroundStyle, $motionArtworkOnStage, $motionArtworkPriority, $motionArtwork } from "../../utils/stores.ts";
 import { isExperimentEnabled, onExperimentChange } from "../../utils/experiments.ts";
 import { onAnimationFrame } from "../../utils/AnimationFrameLoop.ts";
 import Logger from "../../utils/Logger.ts";
@@ -26,11 +26,6 @@ const immersiveLogger = new Logger("Canvas Immersive");
 
 const ACTIVE_CLASS = "CanvasImmersive";
 const TRANSPARENT_STAGE_CLASS = "CanvasStageTransparent";
-// A Spicy Themes music video is on the stage (CanvasImmersive.css).
-const MUSIC_VIDEO_CLASS = "MusicVideoStage";
-// Keep a short handoff window, but release promptly when the video has really
-// ended so Canvas and motion artwork can immediately take back the NowBar and stage.
-const MUSIC_VIDEO_INACTIVE_GRACE_MS = 750;
 // Matches --CanvasFade in CanvasImmersive.css.
 const FADE_MS = 900;
 const AMBIENT_WIDTH = 80;
@@ -265,7 +260,6 @@ function applyAmbientFilter(ctx: CanvasRenderingContext2D) {
 function MountOnPage(page: HTMLElement) {
   if (mount?.page === page) return;
   Unmount();
-  restoreParkedMusicVideo(page);
 
   const contentBox = page.querySelector<HTMLElement>(".ContentBox");
   const nowBar = contentBox?.querySelector<HTMLElement>(".NowBar");
@@ -296,8 +290,7 @@ function MountOnPage(page: HTMLElement) {
   const resizeObserver = new ResizeObserver(() => {
     if (!mount) return;
     resizeAmbient(mount, contentBox);
-    if (active || musicVideoStaged) updateSquareTop(mount);
-    if (musicVideoStaged) placeMusicVideo(mount);
+    if (active) updateSquareTop(mount);
   });
   resizeObserver.observe(contentBox);
   resizeObserver.observe(nowBar);
@@ -305,19 +298,11 @@ function MountOnPage(page: HTMLElement) {
   // The page's classes change all the time (our own toggle included); only a change in
   // whether the theme owns the background or a live music video starts/stops is worth a refresh.
   let themeOwned = themeOwnsBackground(page);
-  let videoActive = hasLiveMusicVideo(page);
   const themeObserver = new MutationObserver(() => {
-    // The side swap moves the stage; the music video follows it.
-    if (mount && musicVideoStaged) placeMusicVideo(mount);
-    const nextVideoActive = hasLiveMusicVideo(page);
-    if (nextVideoActive !== videoActive) {
-      videoActive = nextVideoActive;
-      void Refresh();
-      return;
-    }
     const owned = themeOwnsBackground(page);
     if (owned === themeOwned) return;
     themeOwned = owned;
+    notifyCoverClaim();
     void Refresh();
   });
   themeObserver.observe(page, { attributes: true, attributeFilter: ["class"] });
@@ -326,6 +311,7 @@ function MountOnPage(page: HTMLElement) {
     const nextVideoPlayerPresent = hasLiveMusicVideo(page);
     if (nextVideoPlayerPresent === videoPlayerPresent) return;
     videoPlayerPresent = nextVideoPlayerPresent;
+    notifyCoverClaim();
     void Refresh();
   });
   videoObserver.observe(page, { childList: true, subtree: true });
@@ -364,7 +350,6 @@ function Unmount() {
   mount.stopVisibility();
   for (const layer of mount.layers) releaseLayer(layer);
   mount.page.classList.remove(ACTIVE_CLASS, TRANSPARENT_STAGE_CLASS);
-  releaseMusicVideo(mount.page);
   mount.ambient.remove();
   mount.stage.remove();
   mount.nowBar.style.removeProperty("--CanvasSquareTop");
@@ -387,14 +372,6 @@ function releaseLayer(layer: Layer) {
   layer.detach = null;
   layer.key = null;
   delete layer.box.dataset.source;
-}
-
-// Spicy Themes treats every <video> under the lyrics page as a possible music
-// video, even an unloaded one.  Do not leave our two reusable Canvas slots in
-// its scan while it owns the stage; put the same elements back only when Canvas
-// or motion artwork needs one again.
-function detachCanvasLayerVideos(m: Mount): void {
-  for (const layer of m.layers) layer.video.remove();
 }
 
 function ensureCanvasLayerVideo(layer: Layer): void {
@@ -644,251 +621,10 @@ function syncPlayback() {
   lastAmbientTime = -1;
 }
 
-// ─── Spicy Themes music videos ──────────────────────────────────────────────
-//
-// With $musicVideoOnStage on, a Spicy Themes music video (the page has st-mv-active) plays
-// where the Canvas Stage would, in the stage's layout, instead of behind the lyrics. Spicy Themes
-// keeps playing it in its own element: only its box moves, to the stage's box, measured here and
-// handed to CanvasImmersive.css. The rest of the page keeps the Kawarp background. Left alone
-// when Spicy Themes puts the video beside the lyrics itself (st-mv-stage).
-
-let musicVideoStaged = false;
-let musicVideoReleaseTimer: ReturnType<typeof setTimeout> | null = null;
-let lastMusicVideoTrace = "";
-let musicVideoRemovalTracingInstalled = false;
-let parkedMusicVideo: HTMLElement | null = null;
-let musicVideoParkingHost: HTMLElement | null = null;
-let musicVideoParkingTimer: ReturnType<typeof setTimeout> | null = null;
-
-// The player is the authoritative live signal. The theme class can be missing,
-// stale, or cleared during a player transition, and must never own the stage by itself.
+// The actual Spicy Themes player is the authoritative signal for automatic NowBar handling.
 function hasLiveMusicVideo(page: HTMLElement): boolean {
   const player = page.querySelector<HTMLElement>("#spicy-themes-mv");
-  // Spicy Themes keeps this wrapper while refreshMusicVideoLayer clears and
-  // rebuilds its contents. An empty wrapper is not a live player.
   return !!player?.firstElementChild;
-}
-
-function parkMusicVideoForPageReplacement(page: HTMLElement): void {
-  if (!musicVideoStaged) return;
-  const player = page.querySelector<HTMLElement>("#spicy-themes-mv");
-  if (!player) return;
-  if (musicVideoParkingTimer) clearTimeout(musicVideoParkingTimer);
-  const host = page.ownerDocument.createElement("div");
-  host.id = "SpicyLyrics_MusicVideoParking";
-  host.style.cssText = "position:fixed;left:-1px;top:-1px;width:1px;height:1px;opacity:0;pointer-events:none;overflow:hidden";
-  page.ownerDocument.body.append(host);
-  host.append(player);
-  parkedMusicVideo = player;
-  musicVideoParkingHost = host;
-  immersiveLogger.info("Parked music video during lyrics page handoff");
-  musicVideoParkingTimer = setTimeout(() => {
-    if (parkedMusicVideo !== player) return;
-    // No replacement page arrived; return ownership to Spicy Themes normally.
-    player.remove();
-    host.remove();
-    parkedMusicVideo = null;
-    musicVideoParkingHost = null;
-    musicVideoParkingTimer = null;
-  }, 1500);
-}
-
-function restoreParkedMusicVideo(page: HTMLElement): void {
-  const player = parkedMusicVideo;
-  if (!player) return;
-  if (musicVideoParkingTimer) clearTimeout(musicVideoParkingTimer);
-  musicVideoParkingTimer = null;
-  page.append(player);
-  musicVideoParkingHost?.remove();
-  musicVideoParkingHost = null;
-  parkedMusicVideo = null;
-  immersiveLogger.info("Restored music video after lyrics page handoff");
-}
-
-function nodeIncludesMusicVideo(node: Node | null): boolean {
-  return node instanceof Element && (node.id === "spicy-themes-mv" || !!node.querySelector("#spicy-themes-mv"));
-}
-
-function describeMusicVideoRemovalTarget(node: Node): string {
-  if (!(node instanceof Element)) return node.nodeName;
-  const classes = [...node.classList].slice(0, 4).join(".");
-  return `${node.tagName.toLowerCase()}${node.id ? `#${node.id}` : ""}${classes ? `.${classes}` : ""}`;
-}
-
-function competingLyricsVideos(): Array<Record<string, unknown>> {
-  return [...document.querySelectorAll<HTMLVideoElement>("#SpicyLyricsPage video")]
-    .filter((video) => !video.closest("#spicy-themes-mv"))
-    .map((video) => ({
-      className: video.className,
-      source: video.currentSrc || video.src || video.querySelector("source")?.src || "",
-      paused: video.paused,
-      readyState: video.readyState,
-      parent: describeMusicVideoRemovalTarget(video.parentElement ?? video),
-    }));
-}
-
-function traceMusicVideoRemoval(operation: string, target: Node, removed?: Node): void {
-  if (!$developerMode.get()) return;
-  const details = {
-    operation,
-    target: describeMusicVideoRemovalTarget(target),
-    removed: removed ? describeMusicVideoRemovalTarget(removed) : undefined,
-    track: playingTrackUri(),
-    competingVideos: competingLyricsVideos(),
-    stack: new Error("Music video removal caller").stack,
-  };
-  console.error("[Spicy Lyrics] Music video removal", details);
-  console.trace("[Spicy Lyrics] Music video removal trace");
-}
-
-// MutationObserver reports a removal after the caller is gone from the stack. In developer
-// mode, wrap the DOM removal entry points just long enough to preserve that real caller stack.
-function installMusicVideoRemovalTracing(): void {
-  if (musicVideoRemovalTracingInstalled) return;
-  musicVideoRemovalTracingInstalled = true;
-
-  const nativeRemoveChild = Node.prototype.removeChild;
-  Node.prototype.removeChild = function (child: Node): Node {
-    if (nodeIncludesMusicVideo(child)) traceMusicVideoRemoval("removeChild", this, child);
-    return nativeRemoveChild.call(this, child);
-  };
-
-  const nativeRemove = Element.prototype.remove;
-  Element.prototype.remove = function (): void {
-    if (nodeIncludesMusicVideo(this)) traceMusicVideoRemoval("remove", this.parentNode ?? this, this);
-    nativeRemove.call(this);
-  };
-
-  const nativeReplaceChildren = Element.prototype.replaceChildren;
-  Element.prototype.replaceChildren = function (...nodes: (Node | string)[]): void {
-    if (nodeIncludesMusicVideo(this)) traceMusicVideoRemoval("replaceChildren", this);
-    nativeReplaceChildren.apply(this, nodes);
-  };
-
-  const innerHTML = Object.getOwnPropertyDescriptor(Element.prototype, "innerHTML");
-  if (innerHTML?.get && innerHTML.set) {
-    Object.defineProperty(Element.prototype, "innerHTML", {
-      ...innerHTML,
-      set(this: Element, value: string) {
-        if (nodeIncludesMusicVideo(this)) traceMusicVideoRemoval("innerHTML", this);
-        innerHTML.set!.call(this, value);
-      },
-    });
-  }
-}
-
-installMusicVideoRemovalTracing();
-
-function traceMusicVideo(reason: string, page: HTMLElement): void {
-  const state = {
-    reason,
-    activeClass: page.classList.contains("st-mv-active"),
-    stageClass: page.classList.contains(MUSIC_VIDEO_CLASS),
-    playerPresent: !!page.querySelector("#spicy-themes-mv"),
-    liveSignal: hasLiveMusicVideo(page),
-    staged: musicVideoStaged,
-    eligible: musicVideoStageEligible(page),
-    releasePending: !!musicVideoReleaseTimer,
-  };
-  const signature = JSON.stringify(state);
-  if (signature === lastMusicVideoTrace) return;
-  lastMusicVideoTrace = signature;
-  immersiveLogger.info("Music video stage", state);
-}
-
-function clearMusicVideoReleaseTimer() {
-  if (!musicVideoReleaseTimer) return;
-  clearTimeout(musicVideoReleaseTimer);
-  musicVideoReleaseTimer = null;
-}
-
-function musicVideoStageEligible(page: HTMLElement): boolean {
-  return (
-    $musicVideoOnStage.get() &&
-    isExperimentEnabled("canvasImmersive") &&
-    !page.classList.contains("st-mv-stage") &&
-    page.classList.contains("NowBarStatus__Open") &&
-    !IsCardMode &&
-    !IsPIP &&
-    !IsCompactMode() &&
-    supportsCanvasStage()
-  );
-}
-
-/** Puts the music video on the stage, or takes it off. True while it's there. */
-function syncMusicVideoStage(m: Mount): boolean {
-  const eligible = musicVideoStageEligible(m.page);
-  const videoActive = hasLiveMusicVideo(m.page);
-  traceMusicVideo("stage sync", m.page);
-  if (videoActive) {
-    clearMusicVideoReleaseTimer();
-    // A canvas or motion request may be awaiting media while the video begins.
-    // Invalidate that request before it can attach over the video stage.
-    if (!musicVideoStaged) generation++;
-  } else if (musicVideoStaged && eligible && !musicVideoReleaseTimer) {
-    musicVideoReleaseTimer = setTimeout(() => {
-      musicVideoReleaseTimer = null;
-      if (mount !== m || hasLiveMusicVideo(m.page) || !musicVideoStageEligible(m.page)) return;
-      traceMusicVideo("inactive grace elapsed; releasing stage", m.page);
-      musicVideoStaged = false;
-      releaseMusicVideo(m.page);
-      if (!active) toggleDockLayout(m, false);
-      notifyCoverClaim();
-      // The video slots were intentionally removed while Spicy Themes owned
-      // the stage. Re-run source selection now that the grace period ended so
-      // Canvas or motion artwork can attach one again.
-      void Refresh();
-    }, MUSIC_VIDEO_INACTIVE_GRACE_MS);
-  } else if (!eligible) {
-    clearMusicVideoReleaseTimer();
-  }
-  // Keep the stage through Spicy Themes' transient inactive state. Otherwise a
-  // short player reload collapses the dock and the video has nowhere to return to.
-  const want = eligible && (videoActive || musicVideoStaged);
-  if (want !== musicVideoStaged) {
-    musicVideoStaged = want;
-    if (want) {
-      // Our own Canvas or motion artwork gives the stage up.
-      // Spicy Themes treats any other <video> in the lyrics page as Spotify's
-      // official music video. Do not leave our outgoing Canvas/motion frame in
-      // the DOM for its fade: that makes it tear down its own player for this track.
-      if (active) deactivate(true);
-      else for (const layer of m.layers) releaseLayer(layer);
-      detachCanvasLayerVideos(m);
-      m.page.classList.add(MUSIC_VIDEO_CLASS);
-      toggleDockLayout(m, true);
-      traceMusicVideo("stage claimed", m.page);
-    } else {
-      releaseMusicVideo(m.page);
-      if (!active) toggleDockLayout(m, false);
-      traceMusicVideo("stage released", m.page);
-    }
-  }
-  if (want) placeMusicVideo(m);
-  return want;
-}
-
-function placeMusicVideo(m: Mount) {
-  const page = m.page.getBoundingClientRect();
-  const stage = m.stage.getBoundingClientRect();
-  if (!stage.width || !stage.height) return;
-  const style = m.page.style;
-  style.setProperty("--SL-MusicVideoX", `${Math.round(stage.left - page.left)}px`);
-  style.setProperty("--SL-MusicVideoY", `${Math.round(stage.top - page.top)}px`);
-  style.setProperty("--SL-MusicVideoW", `${Math.round(stage.width)}px`);
-  style.setProperty("--SL-MusicVideoH", `${Math.round(stage.height)}px`);
-  // The stage's own feather, resolved, so the video fades into the lyrics the same way.
-  const mask = (m.page.ownerDocument.defaultView ?? window).getComputedStyle(m.stage).maskImage;
-  style.setProperty("--SL-MusicVideoMask", mask && mask !== "none" ? mask : "none");
-}
-
-function releaseMusicVideo(page: HTMLElement) {
-  clearMusicVideoReleaseTimer();
-  musicVideoStaged = false;
-  page.classList.remove(MUSIC_VIDEO_CLASS);
-  for (const name of ["--SL-MusicVideoX", "--SL-MusicVideoY", "--SL-MusicVideoW", "--SL-MusicVideoH", "--SL-MusicVideoMask"]) {
-    page.style.removeProperty(name);
-  }
 }
 
 function activate() {
@@ -962,11 +698,6 @@ async function Refresh(isRetry = false) {
   }
   if (PageContainer && PageContainer !== mount?.page && !IsCardMode && !IsPIP) MountOnPage(PageContainer);
   if (!mount) return;
-  // A Spicy Themes music video has the stage: ours stays empty while it plays.
-  if (syncMusicVideoStage(mount)) {
-    notifyCoverClaim();
-    return;
-  }
   if (holdExpiredFor !== playingTrackUri()) holdExpiredFor = null;
   const placement = GetArtworkPlacement();
   // Eligibility or the track changed; whoever draws over the cover re-checks the claim.
@@ -1097,21 +828,17 @@ Global.Event.listen("fullscreen:exit", onFullscreenChange);
 // Compact mode keeps the cover background; switching back brings the canvas back.
 Global.Event.listen("compact-mode:enable", () => void Refresh());
 Global.Event.listen("compact-mode:disable", () => void Refresh());
-Global.Event.listen("page:will-destroy", (page: HTMLElement | null) => {
-  if (page) parkMusicVideoForPageReplacement(page);
-});
 Global.Event.listen("nowbar:open", () => void Refresh());
 Global.Event.listen("nowbar:close", () => void Refresh());
 onExperimentChange((experiment) => {
   if (experiment.id === "canvasImmersive") void Refresh();
 });
 $backgroundStyle.listen(() => {
-  if (mount && (active || musicVideoStaged)) {
+  if (mount && active) {
     mount.page.classList.toggle(TRANSPARENT_STAGE_CLASS, getBackgroundStyle() === "none");
   }
   void Refresh();
 });
 Global.Event.listen("motion-artwork:verdict", () => void Refresh());
-$musicVideoOnStage.listen(() => void Refresh());
 for (const store of [$motionArtwork, $motionArtworkPriority, $motionArtworkOnStage]) store.listen(() => void Refresh());
 SetSideSwapTransition(transitionSideSwap);

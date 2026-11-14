@@ -6,7 +6,6 @@ import {
   $alwaysShowInFullscreen,
   $backgroundStyle,
   $motionArtwork,
-  $musicVideoOnStage,
   $nowBarForMovingArtwork,
   $releaseYearPosition,
   $showVolumeSlider,
@@ -1506,9 +1505,8 @@ let autoChangingNowBar = false;
 
 /** true, false, or "pending" while the motion artwork check for the album runs. */
 function songHasMovingArtwork(): boolean | "pending" {
-  // Only the live Spicy Themes signal claims the NowBar. MusicVideoStage can remain
-  // briefly during handoff, but must not keep the NowBar open after playback ends.
-  if ($musicVideoOnStage.get() && PageContainer?.querySelector("#spicy-themes-mv")?.firstElementChild) return true;
+  // A live Spicy Themes player claims the NowBar. Its native stage owns the video itself.
+  if (PageContainer?.querySelector("#spicy-themes-mv")?.firstElementChild) return true;
   // A Canvas plays on the stage, which needs the dynamic background.
   if (isExperimentEnabled("canvasImmersive") && ["dynamic", "none"].includes($backgroundStyle.get()) && GetPlayingCanvasInfo()) {
     return true;
@@ -1551,11 +1549,32 @@ function SyncAutoNowBar() {
   }
 }
 
+let musicVideoObserver: MutationObserver | null = null;
+let observedMusicVideo = false;
+
+function observeMusicVideoNowBar() {
+  musicVideoObserver?.disconnect();
+  const page = PageContainer;
+  if (!page) return;
+  observedMusicVideo = !!page.querySelector("#spicy-themes-mv")?.firstElementChild;
+  musicVideoObserver = new MutationObserver(() => {
+    const live = !!page.querySelector("#spicy-themes-mv")?.firstElementChild;
+    if (live === observedMusicVideo) return;
+    observedMusicVideo = live;
+    SyncAutoNowBar();
+  });
+  musicVideoObserver.observe(page, { childList: true, subtree: true });
+}
+
+Global.Event.listen("page:open", () => {
+  observeMusicVideoNowBar();
+  SyncAutoNowBar();
+});
+Global.Event.listen("page:destroy", () => musicVideoObserver?.disconnect());
 Global.Event.listen("playback:songchange", () => SyncAutoNowBar());
 Global.Event.listen("motion-artwork:verdict", () => SyncAutoNowBar());
-// Fired when the stage re-decides, including when a Spicy Themes music video starts or stops.
+// Fired when Canvas, motion artwork, or a live Spicy Themes music video changes.
 Global.Event.listen("canvas-stage:change", () => SyncAutoNowBar());
-$musicVideoOnStage.listen(() => SyncAutoNowBar());
 Global.Event.listen("fullscreen:open", () => SyncAutoNowBar());
 Global.Event.listen("fullscreen:exit", () => SyncAutoNowBar());
 $nowBarForMovingArtwork.listen(() => SyncAutoNowBar());

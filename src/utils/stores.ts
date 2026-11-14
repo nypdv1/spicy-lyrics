@@ -347,8 +347,6 @@ export type StaticAutoScroll = "off" | "basic" | "advanced";
 export const $staticAutoScroll = persistAtom<StaticAutoScroll>("staticAutoScroll", "off");
 // With the NowBar turned off, it still comes in for songs with a Canvas or motion artwork.
 export const $nowBarForMovingArtwork = persistAtom<boolean>("nowBarForMovingArtwork", false);
-// A Spicy Themes music video plays on the Canvas Stage, beside the lyrics, instead of behind them.
-export const $musicVideoOnStage = persistAtom<boolean>("musicVideoOnStage", false);
 // lrc.red lyrics synced by its model (lrc:byModel) are used like any other; off skips them.
 export const $lrcRedAcceptModelSynced = persistAtom<boolean>("lrcRedAcceptModelSynced", true);
 // Playback timing offset in milliseconds (bipolar: negative = earlier, positive = later)

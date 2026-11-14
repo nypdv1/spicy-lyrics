@@ -5,6 +5,7 @@ import {
   $longWordThreshold,
   $syllableMerge,
   $syllablePace,
+  $restartVocalStutters,
   $lyricsSize,
   $romanizationDisplay,
   $staticAutoScroll,
@@ -49,6 +50,7 @@ export default function LyricsSection({ query, sectionFilter, showHidden = false
   const longWordThreshold = useStore($longWordThreshold);
   const syllableMerge = useStore($syllableMerge);
   const syllablePace = useStore($syllablePace);
+  const restartVocalStutters = useStore($restartVocalStutters);
   const lyricsSize = useStore($lyricsSize);
   const romanizationDisplay = useStore($romanizationDisplay);
   const staticAutoScroll = useStore($staticAutoScroll);
@@ -79,11 +81,12 @@ export default function LyricsSection({ query, sectionFilter, showHidden = false
   const credits = visible("lyrics-credits-follow-singer") && matches(query, "Credits Follow the Last Singer", "Align credits with the last duet line.");
   const joinSplit = visible("lyrics-syllable-merge") && matches(query, "Join Split Words", "Show a word sung in syllables as one word.");
   const pace = visible("lyrics-syllable-pace") && matches(query, "Keep Syllable Pace", "A joined word lit letter by letter follows each syllable's timing.");
+  const stutters = visible("lyrics-vocal-stutters") && matches(query, "Restart Vocal Stutters", "Connect repeated dashed word fragments while restarting their timing animation.");
   const size = visible("lyrics-size") && matches(query, "Lyrics Size", "Make the lyrics bigger or smaller in every view.");
   const romanization = visible("lyrics-romanization-display") && matches(query, "Romanization", "Show romanization in place of the lyrics, or under each line.");
   const staticScroll = visible("lyrics-static-autoscroll") && matches(query, "Auto-scroll Unsynced Lyrics", "Scroll lyrics without timing through the song.");
   const longWord = visible("lyrics-long-word-threshold") && matches(query, "Long Word Minimum", "Minimum duration for a word to use long held-word effects.");
-  if (![r3, r4, r5, r8, r9, r10, seek, early, lead, smooth, skeleton, credits, joinSplit, pace, size, romanization, staticScroll, longWord].some(Boolean)) return null;
+  if (![r3, r4, r5, r8, r9, r10, seek, early, lead, smooth, skeleton, credits, joinSplit, pace, stutters, size, romanization, staticScroll, longWord].some(Boolean)) return null;
 
   // The Playback Offset row edits the offset for every song, or the playing song's own,
   // which adds to it. TTML Reviewer ignores a song's own offset, so the row stays on All songs.
@@ -114,6 +117,7 @@ export default function LyricsSection({ query, sectionFilter, showHidden = false
     {r10 && <Row settingId="lyrics-wide-duet-padding" label="Wide duet line padding" description="Separate duet voices into wider columns. Disable for compact padding."><Toggle checked={duetLinePadding} onChange={(v) => $duetLinePadding.set(v)} /></Row>}
     {romanization && <Row settingId="lyrics-romanization-display" label="Romanization" description="With romanization on, show it in place of the original lyrics, or as a smaller row under each line."><Select value={romanizationDisplay} options={["replace", "underLine"]} labels={["Replace the line", "Under each line"]} onChange={(v) => $romanizationDisplay.set(v as RomanizationDisplay)} /></Row>}
     {joinSplit && <Row settingId="lyrics-syllable-merge" label="Join Split Words" description="Show a word sung in syllables as one word. Steadily Sung keeps only words with no gap and an even pace between parts; Held Words only those long enough to light up letter by letter."><Select value={syllableMerge} options={["off", "full", "steady", "held"]} labels={["Off", "All Words", "Steadily Sung", "Held Words"]} onChange={(v) => $syllableMerge.set(v as SyllableMerge)} /></Row>}
+    {stutters && <Row settingId="lyrics-vocal-stutters" label="Restart Vocal Stutters" description="Treat repeated dashed starts such as “te-te-test” as one visual word while each fragment restarts its timing animation. Repairs missing word-continuation data too."><Toggle checked={restartVocalStutters} onChange={(v) => $restartVocalStutters.set(v)} /></Row>}
     {longWord && <Row settingId="lyrics-long-word-threshold" label="Long Word Minimum" description="A held word must last at least this long before its per-letter lift and glow run." stacked><Slider value={longWordThreshold} min={250} max={4000} step={50} defaultValue={1500} unit="ms" onChange={(v) => $longWordThreshold.set(v)} /></Row>}
     {pace && <Row settingId="lyrics-syllable-pace" label="Keep Syllable Pace" description="A joined word that lights up letter by letter follows each syllable's timing, slow on a long syllable and quick on a short one." disabled={syllableMerge === "off"} disabledReason="Pick a Join Split Words mode to change this."><Toggle checked={syllablePace} onChange={(v) => $syllablePace.set(v)} /></Row>}
     {credits && <Row settingId="lyrics-credits-follow-singer" label="Credits Follow the Last Singer" description="Align credits with the last duet line."><Toggle checked={creditsFollowLastLine} onChange={(v) => $creditsFollowLastLine.set(v)} /></Row>}

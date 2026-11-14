@@ -5,6 +5,7 @@ import {
   $spaceGravityMode,
   $syllableMerge,
   $syllablePace,
+  $restartVocalStutters,
   isBloomRenderer,
 } from "../../../../utils/stores.ts";
 import { PageContainer } from "../../../../components/Pages/PageView.ts";
@@ -121,12 +122,41 @@ function renderableSyllables(
         s.TransliteratedIsPartOfWord === undefined ? s : { ...s, IsPartOfWord: s.TransliteratedIsPartOfWord }
       )
     : syllables;
+  const stutters = repairVocalStutters(words);
   const merge = $syllableMerge.get();
   const parts =
     merge === "off"
-      ? words
-      : JoinSplitWords(words, merge, (word) => allowLetters && splitLetters(word, useRomanized) !== null);
+      ? stutters
+      : JoinSplitWords(stutters, merge, (word) => allowLetters && splitLetters(word, useRomanized) !== null);
   return parts.filter(HasRenderableText);
+}
+
+/**
+ * Sources often flag a vocal stutter as separate words: "Te-", "te-", "test".
+ * A repeated dashed prefix is not a normal hyphenated phrase, so connect those
+ * elements without merging their time ranges; every fragment then restarts its
+ * own word animation while the line reads naturally as "Te-te-test".
+ */
+function repairVocalStutters(syllables: SyllableData[]): SyllableData[] {
+  if (!$restartVocalStutters.get() || syllables.length < 2) return syllables;
+  const repaired = syllables.map((syllable) => ({ ...syllable }));
+  const dashAtEnd = /[-\u2010-\u2015]\s*$/u;
+  const lettersOnly = (text: string) => text.normalize("NFKD").replace(/[^\p{L}\p{N}]/gu, "").toLocaleLowerCase();
+
+  for (let index = 0; index < repaired.length - 1; index++) {
+    const current = repaired[index];
+    const next = repaired[index + 1];
+    const currentText = current.Text ?? "";
+    if (!dashAtEnd.test(currentText)) continue;
+    const prefix = lettersOnly(currentText.replace(dashAtEnd, ""));
+    const nextText = (next.Text ?? "").trimStart();
+    // Only repair repeated starts (te- test), never an ordinary hyphenated
+    // compound such as "well- known".
+    if (!prefix || !lettersOnly(nextText).startsWith(prefix)) continue;
+    current.IsPartOfWord = true;
+    if (nextText !== next.Text) next.Text = nextText;
+  }
+  return repaired;
 }
 
 // A syllable's letters when it's held long enough to be drawn letter by letter, else null.

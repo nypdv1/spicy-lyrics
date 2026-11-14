@@ -243,6 +243,9 @@ export const $syllableMerge = persistAtom<SyllableMerge>("syllableMerge", "stead
 // A joined word drawn letter by letter times its letters by the syllables it
 // was joined from, instead of spreading them evenly over the whole word.
 export const $syllablePace = persistAtom<boolean>("syllablePace", false);
+// Repair word-sync stutters like "te-" "te-" "test": they stay individually timed
+// so their animation restarts, but render as one dashed word instead of spaced words.
+export const $restartVocalStutters = persistAtom<boolean>("restartVocalStutters", true);
 // With romanization on, whether it replaces the line's text or shows as a
 // smaller row under each line.
 export type RomanizationDisplay = "replace" | "underLine";

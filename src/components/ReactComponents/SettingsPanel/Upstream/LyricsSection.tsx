@@ -11,6 +11,7 @@ import {
   $romanizationDisplay,
   $syllableMerge,
   $syllablePace,
+  $restartVocalStutters,
   $spaceGravityMode,
   $memeFormat,
   $simpleLyricsMode,
@@ -145,6 +146,13 @@ const groups: GroupDef[] = [
             onChange={(v) => $longWordThreshold.set(v)}
           />
         ),
+      },
+      {
+        id: "restartVocalStutters",
+        label: "Restart Vocal Stutters",
+        description: "Treat repeated dashed starts such as te-te-test as one visual word while each fragment restarts its timing animation.",
+        keywords: "stutter vocal repeated dash word sync restart",
+        Control: ({ label }) => <Toggle label={label} checked={useStore($restartVocalStutters)} onChange={(v) => $restartVocalStutters.set(v)} />,
       },
       {
         id: "syllablePace",

@@ -31,6 +31,9 @@ const MUSIC_VIDEO_CLASS = "MusicVideoStage";
 // Keep a short handoff window, but release promptly when the video has really
 // ended so Canvas and motion artwork can immediately take back the NowBar and stage.
 const MUSIC_VIDEO_INACTIVE_GRACE_MS = 750;
+// Let Spicy Themes evaluate a new song before one of our <video>s enters the
+// page. Its own-video detector latches a match for the rest of that track.
+const MUSIC_VIDEO_PROBE_MS = 2500;
 // Matches --CanvasFade in CanvasImmersive.css.
 const FADE_MS = 900;
 const AMBIENT_WIDTH = 80;
@@ -647,11 +650,38 @@ let musicVideoRemovalTracingInstalled = false;
 let parkedMusicVideo: HTMLElement | null = null;
 let musicVideoParkingHost: HTMLElement | null = null;
 let musicVideoParkingTimer: ReturnType<typeof setTimeout> | null = null;
+let musicVideoProbeTrack: string | null = null;
+let musicVideoProbeUntil = 0;
+let musicVideoProbeTimer: ReturnType<typeof setTimeout> | null = null;
 
 // The player is the authoritative live signal. The theme class can be missing,
 // stale, or cleared during a player transition, and must never own the stage by itself.
 function hasLiveMusicVideo(page: HTMLElement): boolean {
   return !!page.querySelector("#spicy-themes-mv");
+}
+
+function reserveStageForMusicVideo(page: HTMLElement): boolean {
+  const themes = (window as any).SpicyThemes;
+  const state = themes?.getState?.();
+  if (!$musicVideoOnStage.get() || !state?.isEnabled || !state?.activeTheme?.musicVideoEnabled || hasLiveMusicVideo(page)) {
+    musicVideoProbeTrack = null;
+    musicVideoProbeUntil = 0;
+    if (musicVideoProbeTimer) clearTimeout(musicVideoProbeTimer);
+    musicVideoProbeTimer = null;
+    return false;
+  }
+  const track = playingTrackUri();
+  if (!track) return false;
+  if (track !== musicVideoProbeTrack) {
+    musicVideoProbeTrack = track;
+    musicVideoProbeUntil = Date.now() + MUSIC_VIDEO_PROBE_MS;
+    if (musicVideoProbeTimer) clearTimeout(musicVideoProbeTimer);
+    musicVideoProbeTimer = setTimeout(() => {
+      musicVideoProbeTimer = null;
+      void Refresh();
+    }, MUSIC_VIDEO_PROBE_MS);
+  }
+  return Date.now() < musicVideoProbeUntil;
 }
 
 function parkMusicVideoForPageReplacement(page: HTMLElement): void {
@@ -944,6 +974,15 @@ async function Refresh(isRetry = false) {
   if (!mount) return;
   // A Spicy Themes music video has the stage: ours stays empty while it plays.
   if (syncMusicVideoStage(mount)) {
+    notifyCoverClaim();
+    return;
+  }
+  // Spicy Themes scans the page for a competing video before it builds its own
+  // player. Yield the stage briefly on a new song so it can make that decision
+  // before Canvas or motion artwork becomes visible.
+  if (reserveStageForMusicVideo(mount.page)) {
+    if (active) deactivate(true);
+    else for (const layer of mount.layers) releaseLayer(layer);
     notifyCoverClaim();
     return;
   }

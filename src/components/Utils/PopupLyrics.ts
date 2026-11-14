@@ -15,12 +15,10 @@ let currentPipWindow = null;
 let pipPageHideHandler: ((event: Event) => void) | null = null;
 
 // Smallest popup viewport the layout is built for: the NowBar (artwork +
-// metadata) plus room for a couple of lyric lines below it. 260 × 180 was
-// technically usable, but the dock's controls, title, and lyrics all fought
-// for the same few pixels and made the Mini Player look broken. Document PiP
-// has no min-size option, so the window is snapped back up instead.
-const PIP_MIN_WIDTH = 320;
-const PIP_MIN_HEIGHT = 220;
+// metadata) plus room for a couple of lyric lines below it. Document PiP has no
+// min-size option, so the window is snapped back up instead.
+const PIP_MIN_WIDTH = 260;
+const PIP_MIN_HEIGHT = 180;
 // Snap once the user lets go — resizing mid-drag fights the OS resize loop.
 const PIP_MIN_SIZE_SETTLE_MS = 200;
 let pipMinSizeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -239,10 +237,8 @@ const OpenPopupLyricsFlow = async () => {
     currentPipWindow = await docPiP.requestWindow({
       disallowReturnToOpener: true,
       preferInitialWindowPlacement: false,
-      // A landscape default reads like a Mini Player while leaving enough
-      // vertical room for lyrics above the dock. Users can still resize it.
-      width: 480,
-      height: 360,
+      width: 390,
+      height: 379,
     });
   } finally {
     docPiP.removeEventListener("enter", startGuardOnEnter);

@@ -302,6 +302,13 @@ class LyricsVirtualizer {
   // _smoothFraction and is applied as a translate on the virtual container.
   private _smoothLastWhole: number | null = null;
   private _smoothFraction = 0;
+  // The window a glide frame last rendered (first:last row); a frame inside the same window
+  // has nothing to mount, unmount or move, so it skips the render pass.
+  private _smoothWindow: string | null = null;
+  // The bottom-fade check, run once per frame at most (see _scheduleBottomMask).
+  private _bottomMaskRAF: number | null = null;
+  // What the full pinned-footer margin was last measured for (see _updatePinnedFooterLayout).
+  private _pinnedFooterMeasuredFor: string | null = null;
   // Layout the glide needs every frame, read once per retarget rather than per
   // frame — each read here forces a layout on top of the lyrics animator's writes.
   // Null means "stale, re-read next frame" (set on viewport resizes).
@@ -862,6 +869,16 @@ class LyricsVirtualizer {
     return Math.min(24, Math.max(8, clientHeight * 0.03));
   }
 
+  // Reading the scroll height right after a render pass's writes forces a layout; once a frame,
+  // before the next pass, it doesn't. The scroll listener covers scrolling itself.
+  private _scheduleBottomMask(): void {
+    if (this._bottomMaskRAF !== null) return;
+    this._bottomMaskRAF = this._window().requestAnimationFrame(() => {
+      this._bottomMaskRAF = null;
+      this._syncBottomMask();
+    });
+  }
+
   private _syncBottomMask = (): void => {
     const scrollEl = this._scrollEl;
     if (!scrollEl?.isConnected) return;
@@ -919,7 +936,11 @@ class LyricsVirtualizer {
       const lastMeasurement = this._virtualizer?.measurementsCache[
         this._allElements.length - 1
       ] as { end: number } | undefined;
-      if (scrollEl && lastMeasurement) {
+      // Depends on the list's length, the viewport and the footer, not on where the list is
+      // scrolled: measured again only when one of those changed.
+      const measuredFor = `${lastMeasurement?.end}:${footerHeight}:${this._containerWidth}:${scrollEl?.clientHeight}`;
+      if (scrollEl && lastMeasurement && measuredFor !== this._pinnedFooterMeasuredFor) {
+        this._pinnedFooterMeasuredFor = measuredFor;
         const scrollRect = scrollEl.getBoundingClientRect();
         const containerOffset =
           virtualContainer.getBoundingClientRect().top - scrollRect.top + scrollEl.scrollTop;
@@ -1741,8 +1762,11 @@ class LyricsVirtualizer {
         }
       });
     }
-    this._updatePinnedFooterLayout();
-    this._syncBottomMask();
+    // Scrolling alone changes neither: only re-lay them out when rows or sizes changed.
+    if (didMeasure || unmountWrappers.length > 0 || Math.abs(sizeDelta) >= 0.5) {
+      this._updatePinnedFooterLayout();
+      this._scheduleBottomMask();
+    }
   }
 
   private _trailingElements(): HTMLElement[] {
@@ -2347,7 +2371,12 @@ class LyricsVirtualizer {
     // mounts rows coming into view in the same frame they are scrolled to.
     if (v.scrollOffset == null || Math.abs(v.scrollOffset - whole) >= 1) {
       v.scrollOffset = whole;
-      this._onVirtualizerChange(v);
+      const items = v.getVirtualItems();
+      const range = `${items[0]?.index ?? -1}:${items[items.length - 1]?.index ?? -1}`;
+      if (range !== this._smoothWindow) {
+        this._smoothWindow = range;
+        this._onVirtualizerChange(v);
+      }
     }
 
     if (settled) {
@@ -2373,6 +2402,7 @@ class LyricsVirtualizer {
       this._stopSmoothScroll();
       // Stand-in for the scrollend remeasures skipped during the glide.
       this._remeasureVisible();
+      this._syncBottomMask();
     } else {
       this._smoothRAF = requestCappedFrame(this._smoothStep, this._window());
     }
@@ -2410,6 +2440,7 @@ class LyricsVirtualizer {
     this._smoothLastTs = null;
     this._smoothLastPosition = null;
     this._smoothLastWhole = null;
+    this._smoothWindow = null;
     this._setSmoothFraction(0);
     if (wasActive) this._setConverging(false);
     this._releaseGlideHold();

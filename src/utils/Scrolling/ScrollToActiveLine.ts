@@ -367,9 +367,15 @@ export function InitializeScrollEvents(ScrollSimplebar: any) {
   currentSimpleBarInstance = ScrollSimplebar;
   wheelHandler = () => handleUserScroll(currentSimpleBarInstance);
   touchMoveHandler = () => handleUserScroll(currentSimpleBarInstance);
+  // A glide writes scrollTop every frame; the button follows once a frame, not once per event.
+  let buttonFrame: number | null = null;
   scrollHandler = () => {
-    UpdateScrollToActiveButton();
-    refreshScrollButtonObservation();
+    if (buttonFrame !== null) return;
+    buttonFrame = requestAnimationFrame(() => {
+      buttonFrame = null;
+      UpdateScrollToActiveButton();
+      refreshScrollButtonObservation();
+    });
   };
   // --- END NEW ---
 

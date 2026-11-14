@@ -248,11 +248,13 @@ function collapseVocalStutters(
     const last = lastMatch.targetEnd;
     const display = syllables.slice(lastMatch.targetStart, last + 1);
     const final = display[display.length - 1];
-    const text = display.reduce(
-      (joined, part, partIndex) =>
-        `${joined}${partIndex > 0 && !display[partIndex - 1].IsPartOfWord ? " " : ""}${part.Text}`,
-      ""
-    );
+    const joinPhraseText = (pick: (part: SyllableData) => string) =>
+      display.reduce(
+        (joined, part, partIndex) =>
+          `${joined}${partIndex > 0 && !display[partIndex - 1].IsPartOfWord ? " " : ""}${pick(part)}`,
+        ""
+      );
+    const text = joinPhraseText((part) => part.Text ?? "");
     const phraseRanges = [
       { start: group[0].prefixStart, end: group[0].prefixEnd },
       ...group.map((entry) => ({ start: entry.targetStart, end: entry.targetEnd })),
@@ -260,6 +262,12 @@ function collapseVocalStutters(
     collapsed.push({
       ...final,
       Text: text,
+      ...(display.some((part) => part.TransliteratedText !== undefined)
+        ? { TransliteratedText: joinPhraseText((part) => part.TransliteratedText ?? part.Text ?? "") }
+        : {}),
+      ...(display.some((part) => part.GibberishText !== undefined)
+        ? { GibberishText: joinPhraseText((part) => part.GibberishText ?? part.Text ?? "") }
+        : {}),
       StartTime: syllables[index].StartTime,
       EndTime: final.EndTime,
       RestartRanges: phraseRanges.map(({ start, end }) => ({

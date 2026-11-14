@@ -1696,10 +1696,17 @@ export function Animate(position: number): void {
           const restartRange = word.RestartRanges?.find((range) =>
             ProcessedPosition >= range.StartTime && ProcessedPosition <= range.EndTime
           );
+          const hasRestartRanges = !!word.RestartRanges?.length;
           const timingStart = restartRange?.StartTime ?? word.StartTime;
           const timingEnd = restartRange?.EndTime ?? word.EndTime;
-          const wordState = getElementState(ProcessedPosition, timingStart, timingEnd);
-          const percentage = getProgressPercentage(ProcessedPosition, timingStart, timingEnd);
+          // Between stutter cues the displayed word has already completed;
+          // never fall back to its outer (first-to-last) duration there.
+          const wordState = restartRange || !hasRestartRanges
+            ? getElementState(ProcessedPosition, timingStart, timingEnd)
+            : ProcessedPosition < word.RestartRanges![0].StartTime ? "NotSung" : "Sung";
+          const percentage = restartRange || !hasRestartRanges
+            ? getProgressPercentage(ProcessedPosition, timingStart, timingEnd)
+            : wordState === "Sung" ? 1 : 0;
           const sweepSpan = sweep?.Spans[wordIndex];
 
           const isLetterGroup = word?.LetterGroup;

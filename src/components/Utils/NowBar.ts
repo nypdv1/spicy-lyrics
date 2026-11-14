@@ -1503,7 +1503,7 @@ let autoDismissedUri: string | null = null;
 /** true, false, or "pending" while the motion artwork check for the album runs. */
 function songHasMovingArtwork(): boolean | "pending" {
   // A Spicy Themes music video headed for the Canvas Stage needs the NowBar's side to play on.
-  if ($musicVideoOnStage.get() && PageContainer?.classList.contains("st-mv-active")) return true;
+  if ($musicVideoOnStage.get() && (PageContainer?.classList.contains("st-mv-active") || PageContainer?.classList.contains("MusicVideoStage"))) return true;
   // A Canvas plays on the stage, which needs the dynamic background.
   if (isExperimentEnabled("canvasImmersive") && $backgroundStyle.get() === "dynamic" && GetPlayingCanvasInfo()) {
     return true;

@@ -27,6 +27,9 @@ const immersiveLogger = new Logger("Canvas Immersive");
 const ACTIVE_CLASS = "CanvasImmersive";
 // A Spicy Themes music video is on the stage (CanvasImmersive.css).
 const MUSIC_VIDEO_CLASS = "MusicVideoStage";
+// Spicy Themes briefly clears st-mv-active while its player reloads or buffers.
+// Keep the stage reserved long enough for that transient state to recover.
+const MUSIC_VIDEO_INACTIVE_GRACE_MS = 2000;
 // Matches --CanvasFade in CanvasImmersive.css.
 const FADE_MS = 900;
 const AMBIENT_WIDTH = 80;
@@ -612,12 +615,18 @@ function syncPlayback() {
 // when Spicy Themes puts the video beside the lyrics itself (st-mv-stage).
 
 let musicVideoStaged = false;
+let musicVideoReleaseTimer: ReturnType<typeof setTimeout> | null = null;
 
-function musicVideoWantsStage(page: HTMLElement): boolean {
+function clearMusicVideoReleaseTimer() {
+  if (!musicVideoReleaseTimer) return;
+  clearTimeout(musicVideoReleaseTimer);
+  musicVideoReleaseTimer = null;
+}
+
+function musicVideoStageEligible(page: HTMLElement): boolean {
   return (
     $musicVideoOnStage.get() &&
     isExperimentEnabled("canvasImmersive") &&
-    page.classList.contains("st-mv-active") &&
     !page.classList.contains("st-mv-stage") &&
     page.classList.contains("NowBarStatus__Open") &&
     !IsCardMode &&
@@ -629,7 +638,25 @@ function musicVideoWantsStage(page: HTMLElement): boolean {
 
 /** Puts the music video on the stage, or takes it off. True while it's there. */
 function syncMusicVideoStage(m: Mount): boolean {
-  const want = musicVideoWantsStage(m.page);
+  const eligible = musicVideoStageEligible(m.page);
+  const videoActive = m.page.classList.contains("st-mv-active");
+  if (videoActive) {
+    clearMusicVideoReleaseTimer();
+  } else if (musicVideoStaged && eligible && !musicVideoReleaseTimer) {
+    musicVideoReleaseTimer = setTimeout(() => {
+      musicVideoReleaseTimer = null;
+      if (mount !== m || m.page.classList.contains("st-mv-active") || !musicVideoStageEligible(m.page)) return;
+      musicVideoStaged = false;
+      releaseMusicVideo(m.page);
+      if (!active) toggleDockLayout(m, false);
+      notifyCoverClaim();
+    }, MUSIC_VIDEO_INACTIVE_GRACE_MS);
+  } else if (!eligible) {
+    clearMusicVideoReleaseTimer();
+  }
+  // Keep the stage through Spicy Themes' transient inactive state. Otherwise a
+  // short player reload collapses the dock and the video has nowhere to return to.
+  const want = eligible && (videoActive || musicVideoStaged);
   if (want !== musicVideoStaged) {
     musicVideoStaged = want;
     if (want) {
@@ -661,6 +688,7 @@ function placeMusicVideo(m: Mount) {
 }
 
 function releaseMusicVideo(page: HTMLElement) {
+  clearMusicVideoReleaseTimer();
   musicVideoStaged = false;
   page.classList.remove(MUSIC_VIDEO_CLASS);
   for (const name of ["--SL-MusicVideoX", "--SL-MusicVideoY", "--SL-MusicVideoW", "--SL-MusicVideoH", "--SL-MusicVideoMask"]) {

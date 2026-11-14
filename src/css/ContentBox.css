@@ -3336,7 +3336,22 @@
   align-items: center;
   justify-content: center;
 }
-/* Cinema View stays in the normal document; actual fullscreen must keep its player. */
+/* Cinema View stays in the normal document; actual fullscreen must keep its player.
+   The NowBar is absolutely positioned, so hiding it alone still left the lyrics
+   with the asymmetric padding reserved for an open player. Reset that reservation
+   as well, giving the lyric viewport its normal full width. */
+:root:not(:fullscreen) #SpicyLyricsPage.Fullscreen.HideNowBarInCinema {
+  --LyricsLeftSidePadding: 18cqw;
+  --LyricsRightSidePadding: 15.5cqw;
+}
+
 :root:not(:fullscreen) #SpicyLyricsPage.Fullscreen.HideNowBarInCinema .ContentBox > .NowBar {
   display: none !important;
+}
+
+:root:not(:fullscreen) #SpicyLyricsPage.Fullscreen.HideNowBarInCinema
+  .LyricsContainer
+  .LyricsContent {
+  padding-left: var(--LyricsLeftSidePadding) !important;
+  padding-right: var(--LyricsRightSidePadding) !important;
 }

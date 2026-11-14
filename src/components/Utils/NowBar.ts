@@ -6,6 +6,7 @@ import {
   $alwaysShowInFullscreen,
   $backgroundStyle,
   $motionArtwork,
+  $musicVideoOnStage,
   $nowBarForMovingArtwork,
   $releaseYearPosition,
   $showVolumeSlider,
@@ -1501,6 +1502,8 @@ let autoDismissedUri: string | null = null;
 
 /** true, false, or "pending" while the motion artwork check for the album runs. */
 function songHasMovingArtwork(): boolean | "pending" {
+  // A Spicy Themes music video headed for the Canvas Stage needs the NowBar's side to play on.
+  if ($musicVideoOnStage.get() && PageContainer?.classList.contains("st-mv-active")) return true;
   // A Canvas plays on the stage, which needs the dynamic background.
   if (isExperimentEnabled("canvasImmersive") && $backgroundStyle.get() === "dynamic" && GetPlayingCanvasInfo()) {
     return true;
@@ -1543,6 +1546,9 @@ function SyncAutoNowBar() {
 
 Global.Event.listen("playback:songchange", () => SyncAutoNowBar());
 Global.Event.listen("motion-artwork:verdict", () => SyncAutoNowBar());
+// Fired when the stage re-decides, including when a Spicy Themes music video starts or stops.
+Global.Event.listen("canvas-stage:change", () => SyncAutoNowBar());
+$musicVideoOnStage.listen(() => SyncAutoNowBar());
 Global.Event.listen("fullscreen:open", () => SyncAutoNowBar());
 Global.Event.listen("fullscreen:exit", () => SyncAutoNowBar());
 $nowBarForMovingArtwork.listen(() => SyncAutoNowBar());

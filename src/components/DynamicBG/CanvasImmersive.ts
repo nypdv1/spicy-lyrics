@@ -1,5 +1,5 @@
 import "../../css/CanvasImmersive.css";
-import { $backgroundStyle, $motionArtworkOnStage, $motionArtworkPriority, $motionArtwork } from "../../utils/stores.ts";
+import { $backgroundStyle, $motionArtworkOnStage, $motionArtworkPriority, $motionArtwork, $musicVideoOnStage } from "../../utils/stores.ts";
 import { isExperimentEnabled, onExperimentChange } from "../../utils/experiments.ts";
 import { onAnimationFrame } from "../../utils/AnimationFrameLoop.ts";
 import Logger from "../../utils/Logger.ts";
@@ -25,6 +25,8 @@ import {
 const immersiveLogger = new Logger("Canvas Immersive");
 
 const ACTIVE_CLASS = "CanvasImmersive";
+// A Spicy Themes music video is on the stage (CanvasImmersive.css).
+const MUSIC_VIDEO_CLASS = "MusicVideoStage";
 // Matches --CanvasFade in CanvasImmersive.css.
 const FADE_MS = 900;
 const AMBIENT_WIDTH = 80;
@@ -283,7 +285,8 @@ function MountOnPage(page: HTMLElement) {
   const resizeObserver = new ResizeObserver(() => {
     if (!mount) return;
     resizeAmbient(mount, contentBox);
-    if (active) updateSquareTop(mount);
+    if (active || musicVideoStaged) updateSquareTop(mount);
+    if (musicVideoStaged) placeMusicVideo(mount);
   });
   resizeObserver.observe(contentBox);
   resizeObserver.observe(nowBar);
@@ -292,6 +295,8 @@ function MountOnPage(page: HTMLElement) {
   // whether the theme owns the background is worth a refresh.
   let themeOwned = themeOwnsBackground(page);
   const themeObserver = new MutationObserver(() => {
+    // The side swap moves the stage; the music video follows it.
+    if (mount && musicVideoStaged) placeMusicVideo(mount);
     const owned = themeOwnsBackground(page);
     if (owned === themeOwned) return;
     themeOwned = owned;
@@ -331,6 +336,7 @@ function Unmount() {
   mount.stopVisibility();
   for (const layer of mount.layers) releaseLayer(layer);
   mount.page.classList.remove(ACTIVE_CLASS);
+  releaseMusicVideo(mount.page);
   mount.ambient.remove();
   mount.stage.remove();
   mount.nowBar.style.removeProperty("--CanvasSquareTop");
@@ -597,6 +603,71 @@ function syncPlayback() {
   lastAmbientTime = -1;
 }
 
+// ─── Spicy Themes music videos ──────────────────────────────────────────────
+//
+// With $musicVideoOnStage on, a Spicy Themes music video (the page has st-mv-active) plays
+// where the Canvas Stage would, in the stage's layout, instead of behind the lyrics. Spicy Themes
+// keeps playing it in its own element: only its box moves, to the stage's box, measured here and
+// handed to CanvasImmersive.css. The rest of the page keeps the Kawarp background. Left alone
+// when Spicy Themes puts the video beside the lyrics itself (st-mv-stage).
+
+let musicVideoStaged = false;
+
+function musicVideoWantsStage(page: HTMLElement): boolean {
+  return (
+    $musicVideoOnStage.get() &&
+    isExperimentEnabled("canvasImmersive") &&
+    page.classList.contains("st-mv-active") &&
+    !page.classList.contains("st-mv-stage") &&
+    page.classList.contains("NowBarStatus__Open") &&
+    !IsCardMode &&
+    !IsPIP &&
+    !IsCompactMode() &&
+    getBackgroundStyle() === "dynamic"
+  );
+}
+
+/** Puts the music video on the stage, or takes it off. True while it's there. */
+function syncMusicVideoStage(m: Mount): boolean {
+  const want = musicVideoWantsStage(m.page);
+  if (want !== musicVideoStaged) {
+    musicVideoStaged = want;
+    if (want) {
+      // Our own Canvas or motion artwork gives the stage up.
+      if (active) deactivate();
+      m.page.classList.add(MUSIC_VIDEO_CLASS);
+      toggleDockLayout(m, true);
+    } else {
+      releaseMusicVideo(m.page);
+      if (!active) toggleDockLayout(m, false);
+    }
+  }
+  if (want) placeMusicVideo(m);
+  return want;
+}
+
+function placeMusicVideo(m: Mount) {
+  const page = m.page.getBoundingClientRect();
+  const stage = m.stage.getBoundingClientRect();
+  if (!stage.width || !stage.height) return;
+  const style = m.page.style;
+  style.setProperty("--SL-MusicVideoX", `${Math.round(stage.left - page.left)}px`);
+  style.setProperty("--SL-MusicVideoY", `${Math.round(stage.top - page.top)}px`);
+  style.setProperty("--SL-MusicVideoW", `${Math.round(stage.width)}px`);
+  style.setProperty("--SL-MusicVideoH", `${Math.round(stage.height)}px`);
+  // The stage's own feather, resolved, so the video fades into the lyrics the same way.
+  const mask = (m.page.ownerDocument.defaultView ?? window).getComputedStyle(m.stage).maskImage;
+  style.setProperty("--SL-MusicVideoMask", mask && mask !== "none" ? mask : "none");
+}
+
+function releaseMusicVideo(page: HTMLElement) {
+  musicVideoStaged = false;
+  page.classList.remove(MUSIC_VIDEO_CLASS);
+  for (const name of ["--SL-MusicVideoX", "--SL-MusicVideoY", "--SL-MusicVideoW", "--SL-MusicVideoH", "--SL-MusicVideoMask"]) {
+    page.style.removeProperty(name);
+  }
+}
+
 function activate() {
   if (!mount || active) return;
   active = true;
@@ -664,6 +735,11 @@ async function Refresh(isRetry = false) {
   }
   if (PageContainer && PageContainer !== mount?.page && !IsCardMode && !IsPIP) MountOnPage(PageContainer);
   if (!mount) return;
+  // A Spicy Themes music video has the stage: ours stays empty while it plays.
+  if (syncMusicVideoStage(mount)) {
+    notifyCoverClaim();
+    return;
+  }
 
   if (holdExpiredFor !== playingTrackUri()) holdExpiredFor = null;
   const placement = GetArtworkPlacement();
@@ -800,5 +876,6 @@ onExperimentChange((experiment) => {
 });
 $backgroundStyle.listen(() => void Refresh());
 Global.Event.listen("motion-artwork:verdict", () => void Refresh());
+$musicVideoOnStage.listen(() => void Refresh());
 for (const store of [$motionArtwork, $motionArtworkPriority, $motionArtworkOnStage]) store.listen(() => void Refresh());
 SetSideSwapTransition(transitionSideSwap);

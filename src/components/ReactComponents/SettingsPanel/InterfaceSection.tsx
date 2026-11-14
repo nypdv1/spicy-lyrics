@@ -19,7 +19,7 @@ import {
 import { $experiment, getExperiment } from "../../../utils/experiments.ts";
 import { $isGlobalNav } from "../../../utils/uiState.ts";
 import { matches, Row, Select, SectionTitle, Toggle } from "./components.tsx";
-import { $motionArtwork, $motionArtworkOnStage, $motionArtworkPriority, $nowBarForMovingArtwork, $staticBackgroundMode, type MotionArtworkPriority } from "../../../utils/stores.ts";
+import { $motionArtwork, $motionArtworkOnStage, $motionArtworkPriority, $musicVideoOnStage, $nowBarForMovingArtwork, $staticBackgroundMode, type MotionArtworkPriority } from "../../../utils/stores.ts";
 import { backgroundModeLabel, canvasStageBackgroundNote } from "./AppearanceSection.tsx";
 
 const SECTION_NAME = "Interface";
@@ -53,6 +53,7 @@ export default function InterfaceSection({ query, sectionFilter, showHidden = fa
   const motionArtworkOnStage = useStore($motionArtworkOnStage);
   const canvasStage = useStore($experiment("canvasImmersive"));
   const nowBarForMovingArtwork = useStore($nowBarForMovingArtwork);
+  const musicVideoOnStage = useStore($musicVideoOnStage);
   const backgroundMode = useStore($staticBackgroundMode);
   const stageBackgroundNote = canvasStageBackgroundNote(backgroundMode);
   if (sectionFilter !== "All" && sectionFilter !== SECTION_NAME) return null;
@@ -66,6 +67,7 @@ export default function InterfaceSection({ query, sectionFilter, showHidden = fa
   const shown = (id: string, label: string, description: string) =>
     matches(query, label, description) &&
     (showHidden ? hiddenSettingIds.includes(id) : !allowHidingSettings || !hiddenSettingIds.includes(id) || Boolean(query.trim()));
+  const musicVideoStage = shown("interface-music-video-stage", "Spicy Themes Music Videos on Canvas Stage", "Play Spicy Themes music videos beside the lyrics on the Canvas Stage. spicythemes mv");
   const movingNowBar = shown("interface-nowbar-moving-artwork", "NowBar for Canvas and Motion Artwork", "With the NowBar off, show it for songs with a Canvas or motion artwork.");
   const motion = shown("interface-motion-artwork", "Motion Artwork", "Play the album's animated cover over the still one.");
   const motionPriority = shown("interface-motion-artwork-priority", "Motion Artwork or Canvas", "Which one plays when a song has both.");
@@ -78,7 +80,7 @@ export default function InterfaceSection({ query, sectionFilter, showHidden = fa
       : stageBackgroundNote
         ? `Only applies with the Default background; Background Type is ${backgroundModeLabel(backgroundMode)}.`
         : undefined;
-  if (!rows.some(Boolean) && !notice && !motion && !motionPriority && !motionStage && !movingNowBar) return null;
+  if (!rows.some(Boolean) && !notice && !motion && !motionPriority && !motionStage && !movingNowBar && !musicVideoStage) return null;
   const normalizedAlwaysShow = alwaysShowInFullscreen === "All" ? "Both" : alwaysShowInFullscreen;
 
   return <>
@@ -90,6 +92,7 @@ export default function InterfaceSection({ query, sectionFilter, showHidden = fa
     {rows[3] && <Row settingId="interface-always-fullscreen" label="Always Show In Fullscreen" description="Keep fullscreen time or controls visible."><Select value={normalizedAlwaysShow} options={fullscreenOptions} onChange={(v) => $alwaysShowInFullscreen.set(v)} /></Row>}
     {rows[4] && <Row settingId="interface-fullscreen-volume" label="Fullscreen Volume Slider" description="Show a volume slider in fullscreen and Cinema View."><Select value={showVolumeSliderFullscreen} options={volumeOptions} onChange={(v) => $showVolumeSliderFullscreen.set(v)} /></Row>}
     {rows[5] && <Row settingId="interface-release-year" label="Release Year Position" description="Show release year near track metadata."><Select value={releaseYearPosition} options={releaseYearOptions} onChange={(v) => $releaseYearPosition.set(v)} /></Row>}
+    {musicVideoStage && <Row settingId="interface-music-video-stage" label="Spicy Themes Music Videos on Canvas Stage" description="When Spicy Themes plays a music video, show it on the Canvas Stage beside the lyrics, in the stage's player layout, instead of behind them. The rest of the page keeps the dynamic background. Needs the NowBar open (or NowBar for Canvas and Motion Artwork), and doesn't apply in compact mode or the popup." note={musicVideoOnStage && (!canvasStage ? `Not showing: turn on ${getExperiment("canvasImmersive").label} in Experiments.` : stageBackgroundNote)}><Toggle checked={musicVideoOnStage} onChange={(v) => $musicVideoOnStage.set(v)} /></Row>}
     {movingNowBar && <Row settingId="interface-nowbar-moving-artwork" label="NowBar for Canvas and Motion Artwork" description="With the NowBar turned off, bring it in for songs that have a Canvas or motion artwork, and let it go again for songs that don't. The NowBar button hides it for the current song." note={nowBarForMovingArtwork && (!canvasStage || stageBackgroundNote) && `Songs with only a Canvas won't bring it in: Canvas plays with ${getExperiment("canvasImmersive").label} on and the Default background. Motion artwork still does.`}><Toggle checked={nowBarForMovingArtwork} onChange={(v) => $nowBarForMovingArtwork.set(v)} /></Row>}
     {motion && <Row settingId="interface-motion-artwork" label="Motion Artwork" description="Play the album's animated cover over the still one in the NowBar, for albums that have one."><Toggle checked={motionArtwork} onChange={(v) => $motionArtwork.set(v)} /></Row>}
     {motionPriority && <Row settingId="interface-motion-artwork-priority" label="Motion Artwork or Canvas" description="Which one plays when a song has both. Motion Artwork plays on the cover, or on the stage if it's allowed there below." disabled={Boolean(stageRowsDisabledReason)} disabledReason={stageRowsDisabledReason} note={stageRowsDisabledReason}><Select value={motionArtworkPriority} options={["motion", "canvas"]} labels={["Motion", "Canvas"]} disabled={Boolean(stageRowsDisabledReason)} onChange={(v) => $motionArtworkPriority.set(v as MotionArtworkPriority)} /></Row>}

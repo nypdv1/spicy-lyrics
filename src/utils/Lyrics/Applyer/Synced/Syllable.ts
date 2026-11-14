@@ -141,20 +141,32 @@ function repairVocalStutters(syllables: SyllableData[]): SyllableData[] {
   if (!$restartVocalStutters.get() || syllables.length < 2) return syllables;
   const repaired = syllables.map((syllable) => ({ ...syllable }));
   const dashAtEnd = /[-\u2010-\u2015]\s*$/u;
+  const dashOnly = /^\s*[-\u2010-\u2015]\s*$/u;
+  const dashAtStart = /^\s*[-\u2010-\u2015]\s*/u;
   const lettersOnly = (text: string) => text.normalize("NFKD").replace(/[^\p{L}\p{N}]/gu, "").toLocaleLowerCase();
 
   for (let index = 0; index < repaired.length - 1; index++) {
     const current = repaired[index];
-    const next = repaired[index + 1];
     const currentText = current.Text ?? "";
-    if (!dashAtEnd.test(currentText)) continue;
-    const prefix = lettersOnly(currentText.replace(dashAtEnd, ""));
-    const nextText = (next.Text ?? "").trimStart();
+    let targetIndex = index + 1;
+    let prefixText = currentText;
+    // Some providers time an em dash as its own word. Treat that punctuation
+    // as the separator between two repeated starts as well.
+    if (!dashAtEnd.test(prefixText) && dashOnly.test(repaired[targetIndex]?.Text ?? "")) {
+      targetIndex++;
+      prefixText = `${prefixText}-`;
+    }
+    if (!dashAtEnd.test(prefixText)) continue;
+    const target = repaired[targetIndex];
+    if (!target) continue;
+    const prefix = lettersOnly(prefixText.replace(dashAtEnd, ""));
+    const nextText = (target.Text ?? "").replace(dashAtStart, "").trimStart();
     // Only repair repeated starts (te- test), never an ordinary hyphenated
     // compound such as "well- known".
     if (!prefix || !lettersOnly(nextText).startsWith(prefix)) continue;
     current.IsPartOfWord = true;
-    if (nextText !== next.Text) next.Text = nextText;
+    for (let separator = index + 1; separator < targetIndex; separator++) repaired[separator].IsPartOfWord = true;
+    if (nextText !== target.Text) target.Text = nextText;
   }
   return repaired;
 }

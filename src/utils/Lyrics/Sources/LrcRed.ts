@@ -56,6 +56,7 @@ const isModelSynced = (ttml: string): boolean => /<tt\b[^>]*\blrc:byModel\s*=\s*
 
 const MODEL_SYNC_MIN_FINAL_WORD_DURATION = 0.15;
 const MODEL_SYNC_SHORT_FINAL_WORD_DURATION = 0.1;
+const MODEL_SYNC_NEXT_LINE_MAX_GAP = 2;
 
 function addLeadPiece(lead: any[], syllable: any, rawText: string): void {
   let text = rawText.trim();
@@ -128,13 +129,16 @@ function moveModelSyncedParentheticalsToBackground(lyrics: any): void {
 
 /**
  * lrc.red's model occasionally gives a line's final word an almost zero-length
- * window. Keep the word as one unit (it may be split across several syllables)
- * and extend only that last syllable's end so the whole final word lasts 150 ms.
+ * window. When the following line is close, carry that final word through to its
+ * start; a real gap still gets the conservative 150 ms fallback. Keep the word
+ * as one unit (it may be split across several syllables) and extend only its
+ * final syllable.
  */
 function fixShortModelSyncedLineEndings(lyrics: any): void {
   if (lyrics?.Type !== "Syllable" || !Array.isArray(lyrics.Content)) return;
 
-  for (const vocal of lyrics.Content) {
+  for (let lineIndex = 0; lineIndex < lyrics.Content.length; lineIndex++) {
+    const vocal = lyrics.Content[lineIndex];
     const syllables = vocal?.Lead?.Syllables;
     if (!Array.isArray(syllables) || syllables.length === 0) continue;
 
@@ -149,7 +153,13 @@ function fixShortModelSyncedLineEndings(lyrics: any): void {
     if (typeof first?.StartTime !== "number" || typeof last?.EndTime !== "number") continue;
     if (last.EndTime - first.StartTime >= MODEL_SYNC_SHORT_FINAL_WORD_DURATION) continue;
 
-    last.EndTime = first.StartTime + MODEL_SYNC_MIN_FINAL_WORD_DURATION;
+    const nextLineStart = lyrics.Content[lineIndex + 1]?.Lead?.StartTime;
+    const gapToNextLine =
+      typeof nextLineStart === "number" ? nextLineStart - last.EndTime : Number.POSITIVE_INFINITY;
+    last.EndTime =
+      gapToNextLine >= 0 && gapToNextLine <= MODEL_SYNC_NEXT_LINE_MAX_GAP
+        ? nextLineStart
+        : first.StartTime + MODEL_SYNC_MIN_FINAL_WORD_DURATION;
     vocal.Lead.EndTime = last.EndTime;
   }
 }

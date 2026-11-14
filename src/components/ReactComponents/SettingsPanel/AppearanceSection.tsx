@@ -60,9 +60,12 @@ export default function AppearanceSection({ query, sectionFilter, showHidden = f
 
   const visible = (id: string) => showHidden ? hiddenSettingIds.includes(id) : !allowHidingSettings || !hiddenSettingIds.includes(id) || Boolean(query.trim());
   const r1 = visible("appearance-custom-font") && matches(query, "Use Custom Font", "Use a custom font instead of the bundled Spicy Lyrics font.");
-  const r2 = visible("appearance-custom-font") && customFontEnabled && matches(query, "Font Source", "Choose Google Fonts or an installed system font family for lyrics.");
-  const r2a = visible("appearance-custom-font") && customFontEnabled && customFontSource === "google" && matches(query, "Google Font", "Choose a font from Google Fonts.");
-  const r2b = visible("appearance-custom-font") && customFontEnabled && customFontSource === "system" && matches(query, "System Font", "Choose an installed font family for lyrics.");
+  // Keep the font controls mounted while custom fonts are off. Mounting them on
+  // the toggle's click made the settings below jump in like a menu had opened;
+  // a disabled control communicates the dependency without changing the layout.
+  const r2 = visible("appearance-custom-font") && matches(query, "Font Source", "Choose Google Fonts or an installed system font family for lyrics.");
+  const r2a = visible("appearance-custom-font") && customFontSource === "google" && matches(query, "Google Font", "Choose a font from Google Fonts.");
+  const r2b = visible("appearance-custom-font") && customFontSource === "system" && matches(query, "System Font", "Choose an installed font family for lyrics.");
   const r3 = visible("appearance-background-type") && matches(query, "Background Type", "Choose the dynamic, legacy, static image, or color background.");
   const r4 = visible("appearance-npv-background") && matches(query, "Display Dynamic Background in Now Playing View", "Show the animated background in the Now Playing panel.");
   const blurApplies = ["auto", "artistHeader", "coverArt"].includes(staticBackgroundMode);
@@ -147,19 +150,19 @@ export default function AppearanceSection({ query, sectionFilter, showHidden = f
 
       {r2 && (
         <Row label="Font Source" description="Choose Google Fonts or a locally installed system font.">
-          <Select value={customFontSource} options={["google", "system"]} labels={["Google Fonts", "System Font"]} onChange={(value) => $customFontSource.set(value as typeof customFontSource)} />
+          <Select disabled={!customFontEnabled} value={customFontSource} options={["google", "system"]} labels={["Google Fonts", "System Font"]} onChange={(value) => $customFontSource.set(value as typeof customFontSource)} />
         </Row>
       )}
 
       {r2a && (
         <Row label="Google Font" description="Browse Google Fonts with live previews. The selected font loads through coolLabs Fonts.">
-          <FontPreviewPicker source="google" value={GOOGLE_FONT_OPTIONS.includes(customFont as typeof GOOGLE_FONT_OPTIONS[number]) ? customFont : ""} onChange={(value) => $customFont.set(value)} />
+          <FontPreviewPicker disabled={!customFontEnabled} source="google" value={GOOGLE_FONT_OPTIONS.includes(customFont as typeof GOOGLE_FONT_OPTIONS[number]) ? customFont : ""} onChange={(value) => $customFont.set(value)} />
         </Row>
       )}
 
       {r2b && (
         <Row label="System Font" description="Browse installed fonts with live previews.">
-          <FontPreviewPicker source="system" value={customFont} onChange={(value) => $customFont.set(value)} />
+          <FontPreviewPicker disabled={!customFontEnabled} source="system" value={customFont} onChange={(value) => $customFont.set(value)} />
         </Row>
       )}
 

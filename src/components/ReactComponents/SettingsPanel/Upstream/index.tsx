@@ -408,13 +408,20 @@ export default function SettingsPanel() {
                 {/* Experiment rows are all held at once, so the tab says it once, not per row. */}
                 {section.id === "experiments" && reviewerOn && <p className="sl-us-intro">{REVIEWER_LOCK_REASON}</p>}
                 {hasRows ? (
-                  groups.map((group, i) => (
-                    <div className="sl-us-group" key={group.title ?? i}>
-                      {group.title && <h3 className="sl-us-group-title">{group.title}</h3>}
+                  groups.map((group, i) => group.title ? (
+                    <details className="sl-us-group sl-us-group--collapsible" key={group.title} open={i === 0}>
+                      <summary className="sl-us-group-title">
+                        <span>{group.title}</span>
+                        <span className="sl-us-group-chevron" aria-hidden="true">{ChevronIcon}</span>
+                      </summary>
                       <div className="sl-us-card">
-                        {group.settings.map((def) => (
-                          <SettingRow key={def.id} def={def} query="" />
-                        ))}
+                        {group.settings.map((def) => <SettingRow key={def.id} def={def} query="" />)}
+                      </div>
+                    </details>
+                  ) : (
+                    <div className="sl-us-group" key={i}>
+                      <div className="sl-us-card">
+                        {group.settings.map((def) => <SettingRow key={def.id} def={def} query="" />)}
                       </div>
                     </div>
                   ))

@@ -336,6 +336,31 @@ sl-generic-modal.SpicyLyricsModal .sl-modal-overlay:has(.sl-us) {
     letter-spacing: 0.01em;
   }
 
+  .sl-us-group--collapsible > .sl-us-group-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    min-height: 36px;
+    padding: 0 2px;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+  }
+
+  .sl-us-group--collapsible > .sl-us-group-title::-webkit-details-marker { display: none; }
+
+  .sl-us-group-chevron {
+    display: inline-flex;
+    color: var(--color-text-tertiary);
+    transition: transform var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
+  }
+
+  .sl-us-group--collapsible[open] > .sl-us-group-title .sl-us-group-chevron { transform: rotate(90deg); }
+  .sl-us-group--collapsible > .sl-us-group-title:hover { color: var(--color-text-primary); }
+  .sl-us-group--collapsible > .sl-us-group-title:focus-visible { outline: 1.5px solid var(--hairline-strong); outline-offset: 3px; border-radius: var(--radius-sm); }
+  .sl-us-group--collapsible:not([open]) { margin-bottom: 0; }
+
   .sl-us-group-link {
     display: inline-flex;
     align-items: center;

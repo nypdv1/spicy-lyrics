@@ -700,6 +700,18 @@ function describeMusicVideoRemovalTarget(node: Node): string {
   return `${node.tagName.toLowerCase()}${node.id ? `#${node.id}` : ""}${classes ? `.${classes}` : ""}`;
 }
 
+function competingLyricsVideos(): Array<Record<string, unknown>> {
+  return [...document.querySelectorAll<HTMLVideoElement>("#SpicyLyricsPage video")]
+    .filter((video) => !video.closest("#spicy-themes-mv"))
+    .map((video) => ({
+      className: video.className,
+      source: video.currentSrc || video.src || video.querySelector("source")?.src || "",
+      paused: video.paused,
+      readyState: video.readyState,
+      parent: describeMusicVideoRemovalTarget(video.parentElement ?? video),
+    }));
+}
+
 function traceMusicVideoRemoval(operation: string, target: Node, removed?: Node): void {
   if (!$developerMode.get()) return;
   const details = {
@@ -707,6 +719,7 @@ function traceMusicVideoRemoval(operation: string, target: Node, removed?: Node)
     target: describeMusicVideoRemovalTarget(target),
     removed: removed ? describeMusicVideoRemovalTarget(removed) : undefined,
     track: playingTrackUri(),
+    competingVideos: competingLyricsVideos(),
     stack: new Error("Music video removal caller").stack,
   };
   console.error("[Spicy Lyrics] Music video removal", details);

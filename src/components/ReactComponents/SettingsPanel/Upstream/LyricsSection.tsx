@@ -130,7 +130,7 @@ const groups: GroupDef[] = [
       {
         id: "longWordThreshold",
         label: "Long Word Minimum",
-        description: "A held word must last at least this long before it uses the stronger long-word letter effect.",
+        description: "A held word must last at least this long before its per-letter lift and glow run in Simple Lyrics Mode or Bloom.",
         keywords: "held word duration timer threshold letter effect",
         stacked: true,
         Control: ({ label }) => (

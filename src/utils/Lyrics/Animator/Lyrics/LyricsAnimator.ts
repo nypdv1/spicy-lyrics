@@ -2037,7 +2037,11 @@ export function Animate(position: number): void {
                 );
 
                 // Apply proximity-based animation if an active letter is found
-                if (activeLetterIndex !== -1) {
+                // In the Simple/Bloom family this is the actual held-word gate,
+                // not merely a small strength adjustment. At the chosen minimum
+                // the per-letter lift and glow begin; shorter words stay plain.
+                const isLongHeldWord = word.TotalTime >= $longWordThreshold.get();
+                if (activeLetterIndex !== -1 && (!simpleFamily() || isLongHeldWord)) {
                   // Get the base animation values for the active letter
                   const percentageCount = simpleFamily()
                     ? getProgressPercentage(ProcessedPosition, word.StartTime, word.EndTime)
@@ -2046,25 +2050,13 @@ export function Animate(position: number): void {
                   const config = SimpleLyricsMode_LetterEffectsStrengthConfig;
                   const baseScale =
                   LetterScaleSpline.at(percentageCount) *
-                    (simpleFamily()
-                      ? word.TotalTime > $longWordThreshold.get()
-                        ? config.Longer.Scale
-                        : config.Shorter.Scale
-                      : 1);
+                    (simpleFamily() ? config.Longer.Scale : 1);
                   const baseYOffset =
                     LetterYOffsetSpline.at(percentageCount) *
-                    (simpleFamily()
-                      ? word.TotalTime > $longWordThreshold.get()
-                        ? config.Longer.YOffset
-                        : config.Shorter.YOffset
-                      : 1);
+                    (simpleFamily() ? config.Longer.YOffset : 1);
                   const baseGlow =
                     GlowSpline.at(percentageCount) *
-                    (simpleFamily()
-                      ? word.TotalTime > $longWordThreshold.get()
-                        ? config.Longer.Glow
-                        : config.Shorter.Glow
-                      : 1);
+                    (simpleFamily() ? config.Longer.Glow : 1);
 
                   // Get the resting values
                   const restingScale = LetterScaleSpline.at(0);

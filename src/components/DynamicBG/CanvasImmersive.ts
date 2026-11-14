@@ -639,6 +639,24 @@ let musicVideoStaged = false;
 let musicVideoReleaseTimer: ReturnType<typeof setTimeout> | null = null;
 let musicVideoRecoveryTimer: ReturnType<typeof setTimeout> | null = null;
 let lastMusicVideoRecovery = 0;
+let lastMusicVideoTrace = "";
+
+function traceMusicVideo(reason: string, page: HTMLElement): void {
+  const state = {
+    reason,
+    activeClass: page.classList.contains("st-mv-active"),
+    stageClass: page.classList.contains(MUSIC_VIDEO_CLASS),
+    playerPresent: !!page.querySelector("#spicy-themes-mv"),
+    staged: musicVideoStaged,
+    eligible: musicVideoStageEligible(page),
+    releasePending: !!musicVideoReleaseTimer,
+    recoveryPending: !!musicVideoRecoveryTimer,
+  };
+  const signature = JSON.stringify(state);
+  if (signature === lastMusicVideoTrace) return;
+  lastMusicVideoTrace = signature;
+  immersiveLogger.info("Music video stage", state);
+}
 
 function recoverMissingMusicVideo(page: HTMLElement): void {
   if (!musicVideoStaged || !page.classList.contains("st-mv-active")) return;
@@ -648,12 +666,14 @@ function recoverMissingMusicVideo(page: HTMLElement): void {
     return;
   }
   if (musicVideoRecoveryTimer || Date.now() - lastMusicVideoRecovery < 10_000) return;
+  traceMusicVideo("player missing; recovery queued", page);
   musicVideoRecoveryTimer = setTimeout(() => {
     musicVideoRecoveryTimer = null;
     if (!musicVideoStaged || !page.classList.contains("st-mv-active") || page.querySelector("#spicy-themes-mv")) return;
     const themes = (window as any).SpicyThemes;
     if (!themes?.getState?.()?.isEnabled || !themes.disable || !themes.enable) return;
     lastMusicVideoRecovery = Date.now();
+    traceMusicVideo("restarting Spicy Themes after missing player", page);
     themes.disable();
     setTimeout(() => themes.enable(), 50);
   }, 1500);
@@ -682,6 +702,7 @@ function musicVideoStageEligible(page: HTMLElement): boolean {
 function syncMusicVideoStage(m: Mount): boolean {
   const eligible = musicVideoStageEligible(m.page);
   const videoActive = m.page.classList.contains("st-mv-active");
+  traceMusicVideo("stage sync", m.page);
   if (videoActive) {
     clearMusicVideoReleaseTimer();
     // A canvas or motion request may be awaiting media while the video begins.
@@ -691,6 +712,7 @@ function syncMusicVideoStage(m: Mount): boolean {
     musicVideoReleaseTimer = setTimeout(() => {
       musicVideoReleaseTimer = null;
       if (mount !== m || m.page.classList.contains("st-mv-active") || !musicVideoStageEligible(m.page)) return;
+      traceMusicVideo("inactive grace elapsed; releasing stage", m.page);
       musicVideoStaged = false;
       releaseMusicVideo(m.page);
       if (!active) toggleDockLayout(m, false);
@@ -709,9 +731,11 @@ function syncMusicVideoStage(m: Mount): boolean {
       if (active) deactivate();
       m.page.classList.add(MUSIC_VIDEO_CLASS);
       toggleDockLayout(m, true);
+      traceMusicVideo("stage claimed", m.page);
     } else {
       releaseMusicVideo(m.page);
       if (!active) toggleDockLayout(m, false);
+      traceMusicVideo("stage released", m.page);
     }
   }
   if (want) placeMusicVideo(m);

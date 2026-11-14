@@ -28,9 +28,10 @@ const ACTIVE_CLASS = "CanvasImmersive";
 const TRANSPARENT_STAGE_CLASS = "CanvasStageTransparent";
 // A Spicy Themes music video is on the stage (CanvasImmersive.css).
 const MUSIC_VIDEO_CLASS = "MusicVideoStage";
-// Spicy Themes briefly clears st-mv-active while its player reloads or buffers.
-// Keep the stage reserved long enough for that transient state to recover.
-const MUSIC_VIDEO_INACTIVE_GRACE_MS = 6000;
+// Spicy Themes can briefly clear st-mv-active while its player reloads. Keep a
+// short handoff window, but release promptly when the video has really ended so
+// Canvas and motion artwork can immediately take back the NowBar and stage.
+const MUSIC_VIDEO_INACTIVE_GRACE_MS = 750;
 // Matches --CanvasFade in CanvasImmersive.css.
 const FADE_MS = 900;
 const AMBIENT_WIDTH = 80;

@@ -1499,13 +1499,18 @@ function Session_OpenNowBar() {
 
 let autoShown = false;
 let autoDismissedUri: string | null = null;
+// CloseNowBar writes the persisted store. Keep an automatic close distinct from a
+// user pressing the NowBar button, otherwise the current song is incorrectly marked
+// as manually dismissed and Canvas / motion artwork cannot bring it back.
+let autoChangingNowBar = false;
 
 /** true, false, or "pending" while the motion artwork check for the album runs. */
 function songHasMovingArtwork(): boolean | "pending" {
-  // A Spicy Themes music video headed for the Canvas Stage needs the NowBar's side to play on.
-  if ($musicVideoOnStage.get() && (PageContainer?.classList.contains("st-mv-active") || PageContainer?.classList.contains("MusicVideoStage"))) return true;
+  // Only the live Spicy Themes signal claims the NowBar. MusicVideoStage can remain
+  // briefly during handoff, but must not keep the NowBar open after playback ends.
+  if ($musicVideoOnStage.get() && PageContainer?.classList.contains("st-mv-active")) return true;
   // A Canvas plays on the stage, which needs the dynamic background.
-  if (isExperimentEnabled("canvasImmersive") && $backgroundStyle.get() === "dynamic" && GetPlayingCanvasInfo()) {
+  if (isExperimentEnabled("canvasImmersive") && ["dynamic", "none"].includes($backgroundStyle.get()) && GetPlayingCanvasInfo()) {
     return true;
   }
   if (!IsMotionArtworkEnabled()) return false;
@@ -1540,7 +1545,9 @@ function SyncAutoNowBar() {
     OpenNowBar(true);
   } else if (!want && autoShown) {
     autoShown = false;
+    autoChangingNowBar = true;
     CloseNowBar();
+    autoChangingNowBar = false;
   }
 }
 
@@ -1558,7 +1565,7 @@ $backgroundStyle.listen(() => SyncAutoNowBar());
 $isNowBarOpen.listen((open) => {
   if (open) autoShown = false;
   // Turned off by hand on a song that would bring it in: that song keeps it away.
-  else autoDismissedUri = SpotifyPlayer.GetUri() ?? null;
+  else if (!autoChangingNowBar) autoDismissedUri = SpotifyPlayer.GetUri() ?? null;
   queueMicrotask(SyncAutoNowBar);
 });
 onExperimentChange((experiment) => {

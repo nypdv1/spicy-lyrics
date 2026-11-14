@@ -1827,10 +1827,13 @@ export function Animate(position: number): void {
               if (isLetterGroup) {
                 targetYOffset = 0;
               } else {
-                floatCap = Math.min(floatCap, getRefreshedFloat(word.StartTime, ProcessedPosition));
+                floatCap = Math.min(floatCap, getRefreshedFloat(timingStart, ProcessedPosition));
                 targetYOffset = refreshedLiftOffset(floatCap);
               }
-              if (sweepSpan) {
+              // Bloom's line sweep is based on the outer word span. A stutter
+              // reuses one word over several short spans, so its own cue
+              // progress must win instead of being overwritten by that sweep.
+              if (sweepSpan && !word.RestartRanges?.length) {
                 targetGradientPos = getSweepGradientPosition(
                   sweep!.Edges[wordIndex],
                   sweepSpan.X,

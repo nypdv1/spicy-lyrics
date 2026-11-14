@@ -4,17 +4,22 @@ import { FormatPlaybackTime, SongProgressBar } from "./../../utils/Lyrics/SongPr
 import { QueueForceScroll, ResetLastLine } from "../../utils/Scrolling/ScrollToActiveLine.ts";
 import {
   $alwaysShowInFullscreen,
+  $backgroundStyle,
+  $motionArtwork,
+  $nowBarForMovingArtwork,
   $releaseYearPosition,
   $showVolumeSlider,
 } from "../../utils/stores.ts";
 import Defaults from "../Global/Defaults.ts";
 import { GetReleaseYear, PeekReleaseYear, type ReleaseYearQuery } from "../../utils/releaseYear.ts";
-import { onExperimentChange } from "../../utils/experiments.ts";
+import { isExperimentEnabled, onExperimentChange } from "../../utils/experiments.ts";
 import { $isNowBarOpen, $nowBarSide } from "../../utils/uiState.ts";
 import Global from "../Global/Global.ts";
 import Session from "../Global/Session.ts";
 import { COVER_PLACEHOLDER_URL, SpotifyPlayer } from "../Global/SpotifyPlayer.ts";
-import PageView, { PageContainer } from "../Pages/PageView.ts";
+import PageView, { IsCardMode, PageContainer } from "../Pages/PageView.ts";
+import { GetPlayingCanvasInfo } from "../DynamicBG/CanvasVideo.ts";
+import { IsMotionArtworkEnabled, PlayingAlbumId, RequestMotionVerdict } from "../DynamicBG/MotionArtworkSource.ts";
 import { Icons } from "../Styling/Icons.ts";
 import Fullscreen, {
   CleanupMediaBox,
@@ -1459,6 +1464,13 @@ function CloseNowBar() {
 }
 
 function ToggleNowBar() {
+  // Brought in for this song's artwork: the button puts it away again, for this song only.
+  if (autoShown) {
+    autoShown = false;
+    autoDismissedUri = SpotifyPlayer.GetUri() ?? null;
+    CloseNowBar();
+    return;
+  }
   if ($isNowBarOpen.get()) {
     CloseNowBar();
   } else {
@@ -1467,12 +1479,85 @@ function ToggleNowBar() {
 }
 
 function Session_OpenNowBar() {
+  autoShown = false;
   if ($isNowBarOpen.get()) {
     OpenNowBar();
   } else {
     CloseNowBar();
   }
+  SyncAutoNowBar();
 }
+
+// ─── NowBar for moving artwork ──────────────────────────────────────────────
+//
+// With the NowBar turned off and $nowBarForMovingArtwork on, the NowBar comes in (sliding and
+// fading, NowBarAuto in ContentBox.css) for songs with a Canvas or motion artwork, which only
+// play while it's open, and goes away again for songs without. It never changes the saved
+// NowBar setting: opening it by hand keeps it, and the button hides it for the current song.
+// Fullscreen, Cinema View, the popup and the sidebar card place the NowBar themselves.
+
+let autoShown = false;
+let autoDismissedUri: string | null = null;
+
+/** true, false, or "pending" while the motion artwork check for the album runs. */
+function songHasMovingArtwork(): boolean | "pending" {
+  // A Canvas plays on the stage, which needs the dynamic background.
+  if (isExperimentEnabled("canvasImmersive") && $backgroundStyle.get() === "dynamic" && GetPlayingCanvasInfo()) {
+    return true;
+  }
+  if (!IsMotionArtworkEnabled()) return false;
+  const albumId = PlayingAlbumId();
+  if (!albumId) return false;
+  const verdict = RequestMotionVerdict(albumId);
+  return verdict === "available" ? true : verdict === "pending" ? "pending" : false;
+}
+
+function SyncAutoNowBar() {
+  const page = PageContainer;
+  const eligible =
+    !!page &&
+    $nowBarForMovingArtwork.get() &&
+    !$isNowBarOpen.get() &&
+    !Fullscreen.IsOpen &&
+    !IsPIP &&
+    !IsCardMode;
+  page?.classList.toggle("NowBarAuto", eligible);
+  if (!eligible) {
+    autoShown = false;
+    return;
+  }
+  const uri = SpotifyPlayer.GetUri() ?? null;
+  if (autoDismissedUri !== uri) autoDismissedUri = null;
+  const has = songHasMovingArtwork();
+  // Whatever shows stays until the check answers, so a song doesn't flicker it in and out.
+  if (has === "pending") return;
+  const want = has && autoDismissedUri === null;
+  if (want && !autoShown) {
+    autoShown = true;
+    OpenNowBar(true);
+  } else if (!want && autoShown) {
+    autoShown = false;
+    CloseNowBar();
+  }
+}
+
+Global.Event.listen("playback:songchange", () => SyncAutoNowBar());
+Global.Event.listen("motion-artwork:verdict", () => SyncAutoNowBar());
+Global.Event.listen("fullscreen:open", () => SyncAutoNowBar());
+Global.Event.listen("fullscreen:exit", () => SyncAutoNowBar());
+$nowBarForMovingArtwork.listen(() => SyncAutoNowBar());
+$motionArtwork.listen(() => SyncAutoNowBar());
+$backgroundStyle.listen(() => SyncAutoNowBar());
+// Opened by hand, it stays: the setting only acts while the NowBar is off.
+$isNowBarOpen.listen((open) => {
+  if (open) autoShown = false;
+  // Turned off by hand on a song that would bring it in: that song keeps it away.
+  else autoDismissedUri = SpotifyPlayer.GetUri() ?? null;
+  queueMicrotask(SyncAutoNowBar);
+});
+onExperimentChange((experiment) => {
+  if (experiment.id === "canvasImmersive") SyncAutoNowBar();
+});
 
 /* function isSafeAVC(codecStr: string) {
   return /avc1\.(42[0-9A-F]{2}|4D[0-9A-F]{2})/i.test(codecStr);

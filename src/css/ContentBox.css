@@ -167,6 +167,18 @@
   left: calc(100% - var(--NowBarWidth) - var(--NowBarLeftSpacing));
 }
 
+/* NowBar for moving artwork (NowBar.ts): while the NowBar is off, the songs that bring it in
+   fade it in and out as it slides, so it blends in with the song rather than popping up. */
+#SpicyLyricsPage.NowBarAuto .ContentBox .NowBar {
+  transition:
+    left 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+#SpicyLyricsPage.NowBarAuto .ContentBox .NowBar:not(.Active) {
+  opacity: 0;
+}
+
 #SpicyLyricsPage .ContentBox .NowBar .Header .MediaBox {
   --ArtworkBrightness: 1;
   --ControlsOpacity: 0;

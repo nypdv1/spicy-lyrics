@@ -31,6 +31,7 @@ export const SETTING_CATALOG = [
   ["lyrics-syllable-merge", "Join Split Words", "Show a word sung in syllables as one word.", "Lyrics Display"],
   ["lyrics-syllable-pace", "Keep Syllable Pace", "A joined word lit letter by letter follows each syllable's timing.", "Lyrics Display"],
   ["effects-renderer-style", "Renderer Visual Style", "Spring is the default renderer; Bloom fills each line behind one soft edge.", "Effects"],
+  ["interface-nowbar-moving-artwork", "NowBar for Canvas and Motion Artwork", "With the NowBar off, show it for songs with a Canvas or motion artwork.", "Interface"],
   ["interface-motion-artwork", "Motion Artwork", "Play the album's animated cover over the still one.", "Interface"],
   ["interface-motion-artwork-priority", "Motion Artwork or Canvas", "Which one plays when a song has both.", "Interface"],
   ["interface-motion-artwork-stage", "Motion Artwork on Canvas Stage", "Let motion artwork fill the Canvas Stage.", "Interface"],

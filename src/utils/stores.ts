@@ -343,6 +343,8 @@ export const $motionArtworkOnStage = persistAtom<boolean>("motionArtworkOnStage"
 // Unsynced lyrics scroll through at the song's pace: "basic" follows loudness, "advanced" the voice.
 export type StaticAutoScroll = "off" | "basic" | "advanced";
 export const $staticAutoScroll = persistAtom<StaticAutoScroll>("staticAutoScroll", "off");
+// With the NowBar turned off, it still comes in for songs with a Canvas or motion artwork.
+export const $nowBarForMovingArtwork = persistAtom<boolean>("nowBarForMovingArtwork", false);
 // Playback timing offset in milliseconds (bipolar: negative = earlier, positive = later)
 export const $playbackOffset = persistAtom<number>("playbackOffset", 0);
 export const $allowHidingSettings = persistAtom<boolean>("allowHidingSettings", false);

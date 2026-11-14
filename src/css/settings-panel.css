@@ -457,6 +457,16 @@ sl-generic-modal.SpicyLyricsModal .sl-modal-overlay {
       line-height: 1.4;
     }
 
+    /* Why a setting isn't taking effect right now (another setting is in the way). */
+    .sl-sp-row-note {
+      display: block;
+      margin-top: 4px;
+      font-size: var(--text-caption-size) !important;
+      font-weight: var(--w-medium);
+      color: var(--color-status-warning);
+      line-height: 1.4;
+    }
+
     .sl-sp-control {
       display: flex;
       align-items: center;

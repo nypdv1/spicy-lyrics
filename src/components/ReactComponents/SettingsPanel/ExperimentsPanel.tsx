@@ -1,7 +1,8 @@
 import { useStore } from "@nanostores/react";
 import { $experiment, EXPERIMENT_CATEGORIES, $experimentOverrides, $experimentsSyncing, forcedExperimentState, getAdvancedExperiments, getVisibleExperiments, RefreshExperimentOverrides, setExperiment, type ExperimentId, type ResolvedExperiment } from "../../../utils/experiments.ts";
 import { useEffect } from "react";
-import { $enableExperimentalWordSync, $externalCinemaLyricsAllowed } from "../../../utils/stores.ts";
+import { $enableExperimentalWordSync, $externalCinemaLyricsAllowed, $staticBackgroundMode } from "../../../utils/stores.ts";
+import { canvasStageBackgroundNote } from "./AppearanceSection.tsx";
 import { $ttmlReviewer, REVIEWER_LOCK_REASON } from "../../../utils/ttmlReviewer.ts";
 import { Row, SectionTitle, Toggle } from "./components.tsx";
 
@@ -76,9 +77,12 @@ function ExperimentRow({ experiment }: { experiment: ResolvedExperiment }) {
   const syncing = useStore($experimentsSyncing);
   // TTML Reviewer mode holds every experiment where it put it until the mode is turned off.
   const heldByReviewer = useStore($ttmlReviewer);
+  const backgroundMode = useStore($staticBackgroundMode);
+  // Settings elsewhere that keep the experiment from taking effect.
+  const note = experiment.id === "canvasImmersive" && enabled && canvasStageBackgroundNote(backgroundMode);
 
   return (
-    <Row settingId={experimentSettingIds[experiment.id]} label={experiment.label} description={experiment.description} disabled={syncing || forced !== undefined || heldByReviewer} disabledReason={syncing ? "Refreshing experiments" : forced !== undefined ? (forced ? "Forced on" : "Forced off") : REVIEWER_LOCK_REASON}>
+    <Row settingId={experimentSettingIds[experiment.id]} label={experiment.label} description={experiment.description} note={note} disabled={syncing || forced !== undefined || heldByReviewer} disabledReason={syncing ? "Refreshing experiments" : forced !== undefined ? (forced ? "Forced on" : "Forced off") : REVIEWER_LOCK_REASON}>
       <Toggle checked={enabled} onChange={(v) => setExperiment(experiment.id, v)} />
     </Row>
   );

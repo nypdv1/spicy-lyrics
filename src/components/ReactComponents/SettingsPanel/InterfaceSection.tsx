@@ -19,7 +19,8 @@ import {
 import { $experiment, getExperiment } from "../../../utils/experiments.ts";
 import { $isGlobalNav } from "../../../utils/uiState.ts";
 import { matches, Row, Select, SectionTitle, Toggle } from "./components.tsx";
-import { $motionArtwork, $motionArtworkOnStage, $motionArtworkPriority, $nowBarForMovingArtwork, type MotionArtworkPriority } from "../../../utils/stores.ts";
+import { $motionArtwork, $motionArtworkOnStage, $motionArtworkPriority, $nowBarForMovingArtwork, $staticBackgroundMode, type MotionArtworkPriority } from "../../../utils/stores.ts";
+import { backgroundModeLabel, canvasStageBackgroundNote } from "./AppearanceSection.tsx";
 
 const SECTION_NAME = "Interface";
 const vcPositionOptions = ["Top", "Bottom"];
@@ -52,6 +53,8 @@ export default function InterfaceSection({ query, sectionFilter, showHidden = fa
   const motionArtworkOnStage = useStore($motionArtworkOnStage);
   const canvasStage = useStore($experiment("canvasImmersive"));
   const nowBarForMovingArtwork = useStore($nowBarForMovingArtwork);
+  const backgroundMode = useStore($staticBackgroundMode);
+  const stageBackgroundNote = canvasStageBackgroundNote(backgroundMode);
   if (sectionFilter !== "All" && sectionFilter !== SECTION_NAME) return null;
 
   const ids = ["interface-lock-media-box", "interface-disable-popup", "interface-view-controls", "interface-always-fullscreen", "interface-fullscreen-volume", "interface-release-year", "interface-animate-close", "interface-escape-key", "interface-disable-npv", "interface-hide-empty-npv", "interface-open-profiles-browser", "interface-remove-spotify-lyrics"];
@@ -72,7 +75,9 @@ export default function InterfaceSection({ query, sectionFilter, showHidden = fa
     ? "Turn on Motion Artwork to change this."
     : !canvasStage
       ? `Only applies with ${getExperiment("canvasImmersive").label} on, in Experiments.`
-      : undefined;
+      : stageBackgroundNote
+        ? `Only applies with the Default background; Background Type is ${backgroundModeLabel(backgroundMode)}.`
+        : undefined;
   if (!rows.some(Boolean) && !notice && !motion && !motionPriority && !motionStage && !movingNowBar) return null;
   const normalizedAlwaysShow = alwaysShowInFullscreen === "All" ? "Both" : alwaysShowInFullscreen;
 
@@ -85,10 +90,10 @@ export default function InterfaceSection({ query, sectionFilter, showHidden = fa
     {rows[3] && <Row settingId="interface-always-fullscreen" label="Always Show In Fullscreen" description="Keep fullscreen time or controls visible."><Select value={normalizedAlwaysShow} options={fullscreenOptions} onChange={(v) => $alwaysShowInFullscreen.set(v)} /></Row>}
     {rows[4] && <Row settingId="interface-fullscreen-volume" label="Fullscreen Volume Slider" description="Show a volume slider in fullscreen and Cinema View."><Select value={showVolumeSliderFullscreen} options={volumeOptions} onChange={(v) => $showVolumeSliderFullscreen.set(v)} /></Row>}
     {rows[5] && <Row settingId="interface-release-year" label="Release Year Position" description="Show release year near track metadata."><Select value={releaseYearPosition} options={releaseYearOptions} onChange={(v) => $releaseYearPosition.set(v)} /></Row>}
-    {movingNowBar && <Row settingId="interface-nowbar-moving-artwork" label="NowBar for Canvas and Motion Artwork" description="With the NowBar turned off, bring it in for songs that have a Canvas or motion artwork, and let it go again for songs that don't. The NowBar button hides it for the current song."><Toggle checked={nowBarForMovingArtwork} onChange={(v) => $nowBarForMovingArtwork.set(v)} /></Row>}
+    {movingNowBar && <Row settingId="interface-nowbar-moving-artwork" label="NowBar for Canvas and Motion Artwork" description="With the NowBar turned off, bring it in for songs that have a Canvas or motion artwork, and let it go again for songs that don't. The NowBar button hides it for the current song." note={nowBarForMovingArtwork && (!canvasStage || stageBackgroundNote) && `Songs with only a Canvas won't bring it in: Canvas plays with ${getExperiment("canvasImmersive").label} on and the Default background. Motion artwork still does.`}><Toggle checked={nowBarForMovingArtwork} onChange={(v) => $nowBarForMovingArtwork.set(v)} /></Row>}
     {motion && <Row settingId="interface-motion-artwork" label="Motion Artwork" description="Play the album's animated cover over the still one in the NowBar, for albums that have one."><Toggle checked={motionArtwork} onChange={(v) => $motionArtwork.set(v)} /></Row>}
-    {motionPriority && <Row settingId="interface-motion-artwork-priority" label="Motion Artwork or Canvas" description="Which one plays when a song has both. Motion Artwork plays on the cover, or on the stage if it's allowed there below." disabled={Boolean(stageRowsDisabledReason)} disabledReason={stageRowsDisabledReason}><Select value={motionArtworkPriority} options={["motion", "canvas"]} labels={["Motion", "Canvas"]} disabled={Boolean(stageRowsDisabledReason)} onChange={(v) => $motionArtworkPriority.set(v as MotionArtworkPriority)} /></Row>}
-    {motionStage && <Row settingId="interface-motion-artwork-stage" label="Motion Artwork on Canvas Stage" description="Let motion artwork fill the Canvas Stage, cropped to fit since it's square. Off keeps it on the cover in the NowBar." disabled={Boolean(stageRowsDisabledReason)} disabledReason={stageRowsDisabledReason}><Toggle checked={motionArtworkOnStage} onChange={(v) => $motionArtworkOnStage.set(v)} /></Row>}
+    {motionPriority && <Row settingId="interface-motion-artwork-priority" label="Motion Artwork or Canvas" description="Which one plays when a song has both. Motion Artwork plays on the cover, or on the stage if it's allowed there below." disabled={Boolean(stageRowsDisabledReason)} disabledReason={stageRowsDisabledReason} note={stageRowsDisabledReason}><Select value={motionArtworkPriority} options={["motion", "canvas"]} labels={["Motion", "Canvas"]} disabled={Boolean(stageRowsDisabledReason)} onChange={(v) => $motionArtworkPriority.set(v as MotionArtworkPriority)} /></Row>}
+    {motionStage && <Row settingId="interface-motion-artwork-stage" label="Motion Artwork on Canvas Stage" description="Let motion artwork fill the Canvas Stage, cropped to fit since it's square. Off keeps it on the cover in the NowBar." disabled={Boolean(stageRowsDisabledReason)} disabledReason={stageRowsDisabledReason} note={stageRowsDisabledReason}><Toggle checked={motionArtworkOnStage} onChange={(v) => $motionArtworkOnStage.set(v)} /></Row>}
     {rows[6] && <Row settingId="interface-animate-close" label="Animate closing fullscreen" description="Slide the lyrics page away when closing fullscreen."><Toggle checked={animateFullscreenClose} onChange={(v) => $animateFullscreenClose.set(v)} /></Row>}
     {rows[7] && <Row settingId="interface-escape-key" label="Escape Key Function" description="Choose how Escape behaves in lyrics fullscreen."><Select value={escapeKeyFunction} options={escapeOptions} onChange={(v) => $escapeKeyFunction.set(v)} /></Row>}
     {rows[8] && <Row settingId="interface-disable-npv" label="Disable NPV Lyrics" description="Never show the lyrics card in the Now Playing sidebar."><Toggle checked={disableNpvLyrics} onChange={(v) => $disableNpvLyrics.set(v)} /></Row>}

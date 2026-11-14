@@ -1,3 +1,4 @@
+import { $experiment } from "../../../utils/experiments.ts";
 import { useStore } from "@nanostores/react";
 import React from "react";
 import {
@@ -21,6 +22,15 @@ const FPS_SLIDER_DESCRIPTION = "Frames per second while the cap is on.";
 const bgModeOptions = ["default", "legacy", "auto", "artistHeader", "coverArt", "color", "none"];
 const bgModeLabels = ["Default", "Legacy", "Auto", "Artist Header", "Cover Art", "Color", "None (Transparent)"];
 
+/** The Background Type's name as Settings shows it. */
+export const backgroundModeLabel = (mode: string): string => bgModeLabels[bgModeOptions.indexOf(mode)] ?? mode;
+
+/** Why the Canvas Stage can't show with this Background Type, or false when it can. */
+export function canvasStageBackgroundNote(mode: string): string | false {
+  const dynamic = mode === "default" || mode === "off";
+  return !dynamic && `Not showing: Background Type is ${backgroundModeLabel(mode)}. Canvas Stage only plays with the Default background (Appearance).`;
+}
+
 interface Props {
   query: string;
   sectionFilter: string;
@@ -31,6 +41,7 @@ export default function AppearanceSection({ query, sectionFilter, showHidden = f
   const customFontEnabled = useStore($customFontEnabled);
   const customFont = useStore($customFont);
   const staticBackgroundMode = useStore($staticBackgroundMode);
+  const canvasStageEnabled = useStore($experiment("canvasImmersive"));
   const staticBackgroundBlur = useStore($staticBackgroundBlur);
   const showNpvDynamicBg = useStore($showNpvDynamicBg);
   const pinnedFooterMode = useStore($pinnedFooterMode);
@@ -61,7 +72,7 @@ export default function AppearanceSection({ query, sectionFilter, showHidden = f
       <SectionTitle>Appearance</SectionTitle>
 
       {r3 && (
-        <Row settingId="appearance-background-type" label="Background Type" description="Choose the dynamic, legacy, static image, or color background.">
+        <Row settingId="appearance-background-type" label="Background Type" description="Choose the dynamic, legacy, static image, or color background." note={canvasStageEnabled && canvasStageBackgroundNote(staticBackgroundMode) && "Canvas Stage doesn't play with this background: songs with a Canvas show the cover instead. Pick Default to see it."}>
           <Select
             value={staticBackgroundMode === "off" ? "default" : staticBackgroundMode}
             options={bgModeOptions}

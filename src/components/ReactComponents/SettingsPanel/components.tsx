@@ -21,9 +21,12 @@ export function Row({
   labelAccessory,
   stacked,
   settingId,
+  note,
 }: {
   label: string;
   description?: string;
+  /** Why the setting isn't taking effect right now, shown under the description. */
+  note?: string | false;
   children: React.ReactNode;
   disabled?: boolean;
   disabledReason?: string;
@@ -58,6 +61,7 @@ export function Row({
             {labelAccessory}
           </span>
           {description && <span className="sl-sp-description">{description}</span>}
+          {note && <span className="sl-sp-row-note" role="note">{note}</span>}
         </div>
       </div>
       <div className="sl-sp-control">

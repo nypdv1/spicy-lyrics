@@ -28,9 +28,8 @@ const ACTIVE_CLASS = "CanvasImmersive";
 const TRANSPARENT_STAGE_CLASS = "CanvasStageTransparent";
 // A Spicy Themes music video is on the stage (CanvasImmersive.css).
 const MUSIC_VIDEO_CLASS = "MusicVideoStage";
-// Spicy Themes can briefly clear st-mv-active while its player reloads. Keep a
-// short handoff window, but release promptly when the video has really ended so
-// Canvas and motion artwork can immediately take back the NowBar and stage.
+// Keep a short handoff window, but release promptly when the video has really
+// ended so Canvas and motion artwork can immediately take back the NowBar and stage.
 const MUSIC_VIDEO_INACTIVE_GRACE_MS = 750;
 // Matches --CanvasFade in CanvasImmersive.css.
 const FADE_MS = 900;
@@ -309,7 +308,6 @@ function MountOnPage(page: HTMLElement) {
   const themeObserver = new MutationObserver(() => {
     // The side swap moves the stage; the music video follows it.
     if (mount && musicVideoStaged) placeMusicVideo(mount);
-    recoverMissingMusicVideo(page);
     const nextVideoActive = hasLiveMusicVideo(page);
     if (nextVideoActive !== videoActive) {
       videoActive = nextVideoActive;
@@ -324,7 +322,6 @@ function MountOnPage(page: HTMLElement) {
   themeObserver.observe(page, { attributes: true, attributeFilter: ["class"] });
   let videoPlayerPresent = !!page.querySelector("#spicy-themes-mv");
   const videoObserver = new MutationObserver(() => {
-    recoverMissingMusicVideo(page);
     const nextVideoPlayerPresent = !!page.querySelector("#spicy-themes-mv");
     if (nextVideoPlayerPresent === videoPlayerPresent) return;
     videoPlayerPresent = nextVideoPlayerPresent;
@@ -644,14 +641,12 @@ function syncPlayback() {
 
 let musicVideoStaged = false;
 let musicVideoReleaseTimer: ReturnType<typeof setTimeout> | null = null;
-let musicVideoRecoveryTimer: ReturnType<typeof setTimeout> | null = null;
-let lastMusicVideoRecovery = 0;
 let lastMusicVideoTrace = "";
 
-// Some Spicy Themes versions mount their player without adding st-mv-active.
-// The player itself is the reliable live signal in that case.
+// The player is the authoritative live signal. The theme class can be missing,
+// stale, or cleared during a player transition, and must never own the stage by itself.
 function hasLiveMusicVideo(page: HTMLElement): boolean {
-  return page.classList.contains("st-mv-active") || !!page.querySelector("#spicy-themes-mv");
+  return !!page.querySelector("#spicy-themes-mv");
 }
 
 function traceMusicVideo(reason: string, page: HTMLElement): void {
@@ -664,33 +659,11 @@ function traceMusicVideo(reason: string, page: HTMLElement): void {
     staged: musicVideoStaged,
     eligible: musicVideoStageEligible(page),
     releasePending: !!musicVideoReleaseTimer,
-    recoveryPending: !!musicVideoRecoveryTimer,
   };
   const signature = JSON.stringify(state);
   if (signature === lastMusicVideoTrace) return;
   lastMusicVideoTrace = signature;
   immersiveLogger.info("Music video stage", state);
-}
-
-function recoverMissingMusicVideo(page: HTMLElement): void {
-  if (!musicVideoStaged || !page.classList.contains("st-mv-active")) return;
-  if (page.querySelector("#spicy-themes-mv")) {
-    if (musicVideoRecoveryTimer) clearTimeout(musicVideoRecoveryTimer);
-    musicVideoRecoveryTimer = null;
-    return;
-  }
-  if (musicVideoRecoveryTimer || Date.now() - lastMusicVideoRecovery < 10_000) return;
-  traceMusicVideo("player missing; recovery queued", page);
-  musicVideoRecoveryTimer = setTimeout(() => {
-    musicVideoRecoveryTimer = null;
-    if (!musicVideoStaged || !page.classList.contains("st-mv-active") || page.querySelector("#spicy-themes-mv")) return;
-    const themes = (window as any).SpicyThemes;
-    if (!themes?.getState?.()?.isEnabled || !themes.disable || !themes.enable) return;
-    lastMusicVideoRecovery = Date.now();
-    traceMusicVideo("restarting Spicy Themes after missing player", page);
-    themes.disable();
-    setTimeout(() => themes.enable(), 50);
-  }, 1500);
 }
 
 function clearMusicVideoReleaseTimer() {
@@ -772,8 +745,6 @@ function placeMusicVideo(m: Mount) {
 
 function releaseMusicVideo(page: HTMLElement) {
   clearMusicVideoReleaseTimer();
-  if (musicVideoRecoveryTimer) clearTimeout(musicVideoRecoveryTimer);
-  musicVideoRecoveryTimer = null;
   musicVideoStaged = false;
   page.classList.remove(MUSIC_VIDEO_CLASS);
   for (const name of ["--SL-MusicVideoX", "--SL-MusicVideoY", "--SL-MusicVideoW", "--SL-MusicVideoH", "--SL-MusicVideoMask"]) {

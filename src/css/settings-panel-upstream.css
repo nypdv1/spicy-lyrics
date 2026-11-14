@@ -370,8 +370,8 @@ sl-generic-modal.SpicyLyricsModal .sl-modal-overlay:has(.sl-us) {
     margin: 0 0 var(--space-4);
     padding: 8px 0;
     overflow-x: auto;
-    background: color-mix(in oklab, var(--sl-us-field-deep, #000) 82%, transparent);
-    backdrop-filter: blur(14px);
+    /* A light fade protects the chips over rows without becoming a second header. */
+    background: linear-gradient(to bottom, color-mix(in oklab, var(--sl-us-field-deep, #141414) 38%, transparent), transparent);
     scrollbar-width: none;
   }
 

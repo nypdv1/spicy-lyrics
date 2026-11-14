@@ -265,6 +265,7 @@ function applyAmbientFilter(ctx: CanvasRenderingContext2D) {
 function MountOnPage(page: HTMLElement) {
   if (mount?.page === page) return;
   Unmount();
+  restoreParkedMusicVideo(page);
 
   const contentBox = page.querySelector<HTMLElement>(".ContentBox");
   const nowBar = contentBox?.querySelector<HTMLElement>(".NowBar");
@@ -643,11 +644,50 @@ let musicVideoStaged = false;
 let musicVideoReleaseTimer: ReturnType<typeof setTimeout> | null = null;
 let lastMusicVideoTrace = "";
 let musicVideoRemovalTracingInstalled = false;
+let parkedMusicVideo: HTMLElement | null = null;
+let musicVideoParkingHost: HTMLElement | null = null;
+let musicVideoParkingTimer: ReturnType<typeof setTimeout> | null = null;
 
 // The player is the authoritative live signal. The theme class can be missing,
 // stale, or cleared during a player transition, and must never own the stage by itself.
 function hasLiveMusicVideo(page: HTMLElement): boolean {
   return !!page.querySelector("#spicy-themes-mv");
+}
+
+function parkMusicVideoForPageReplacement(page: HTMLElement): void {
+  if (!musicVideoStaged) return;
+  const player = page.querySelector<HTMLElement>("#spicy-themes-mv");
+  if (!player) return;
+  if (musicVideoParkingTimer) clearTimeout(musicVideoParkingTimer);
+  const host = page.ownerDocument.createElement("div");
+  host.id = "SpicyLyrics_MusicVideoParking";
+  host.style.cssText = "position:fixed;left:-1px;top:-1px;width:1px;height:1px;opacity:0;pointer-events:none;overflow:hidden";
+  page.ownerDocument.body.append(host);
+  host.append(player);
+  parkedMusicVideo = player;
+  musicVideoParkingHost = host;
+  immersiveLogger.info("Parked music video during lyrics page handoff");
+  musicVideoParkingTimer = setTimeout(() => {
+    if (parkedMusicVideo !== player) return;
+    // No replacement page arrived; return ownership to Spicy Themes normally.
+    player.remove();
+    host.remove();
+    parkedMusicVideo = null;
+    musicVideoParkingHost = null;
+    musicVideoParkingTimer = null;
+  }, 1500);
+}
+
+function restoreParkedMusicVideo(page: HTMLElement): void {
+  const player = parkedMusicVideo;
+  if (!player) return;
+  if (musicVideoParkingTimer) clearTimeout(musicVideoParkingTimer);
+  musicVideoParkingTimer = null;
+  page.append(player);
+  musicVideoParkingHost?.remove();
+  musicVideoParkingHost = null;
+  parkedMusicVideo = null;
+  immersiveLogger.info("Restored music video after lyrics page handoff");
 }
 
 function nodeIncludesMusicVideo(node: Node | null): boolean {
@@ -1015,6 +1055,9 @@ Global.Event.listen("fullscreen:exit", onFullscreenChange);
 // Compact mode keeps the cover background; switching back brings the canvas back.
 Global.Event.listen("compact-mode:enable", () => void Refresh());
 Global.Event.listen("compact-mode:disable", () => void Refresh());
+Global.Event.listen("page:will-destroy", (page: HTMLElement | null) => {
+  if (page) parkMusicVideoForPageReplacement(page);
+});
 Global.Event.listen("nowbar:open", () => void Refresh());
 Global.Event.listen("nowbar:close", () => void Refresh());
 onExperimentChange((experiment) => {

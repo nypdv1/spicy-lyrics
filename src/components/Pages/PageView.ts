@@ -597,6 +597,9 @@ async function DestroyPage() {
     legacyPage.style.containerType = "";
   }
 
+  // Let integrations which are mounted inside the page preserve their live media
+  // while this view hands off to a replacement (for example NPV -> full page).
+  Global.Event.evoke("page:will-destroy", PageContainer);
   PageContainer?.remove();
   setStockPlaybarPage(null);
   removeLinesEvListener();

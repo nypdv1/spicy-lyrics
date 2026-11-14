@@ -22,7 +22,7 @@ const groups: GroupDef[] = [
         Control: () => (
           <button
             type="button"
-            className="sl-sp-btn"
+            className="sl-us-btn"
             onClick={() => RemoveCurrentLyrics_AllCaches(true)}
           >
             Clear
@@ -35,7 +35,7 @@ const groups: GroupDef[] = [
         description: "Delete all saved lyrics. They are normally kept for up to 3 days.",
         keywords: "clear lyrics cache",
         Control: () => (
-          <button type="button" className="sl-sp-btn" onClick={() => RemoveLyricsCache(true)}>
+          <button type="button" className="sl-us-btn" onClick={() => RemoveLyricsCache(true)}>
             Clear
           </button>
         ),
@@ -48,7 +48,7 @@ const groups: GroupDef[] = [
         Control: () => (
           <button
             type="button"
-            className="sl-sp-btn"
+            className="sl-us-btn"
             onClick={() => RemoveCurrentLyrics_StateCache(true)}
           >
             Reset

@@ -28,20 +28,20 @@ export function ReviewerPane({ labelOf }: { labelOf: (id: string) => string | un
   const defaulted = getVisibleExperiments().filter((experiment) => !held.has(experiment.id));
 
   return (
-    <div className="sl-sp-reviewer">
-      <p className="sl-sp-intro">
+    <div className="sl-us-reviewer">
+      <p className="sl-us-intro">
         Review a sync as it really is, without your setup getting in the way. Everyone in this mode gets the same
         timing and lyric effects.
       </p>
 
-      <div className="sl-sp-card">
+      <div className="sl-us-card">
         <Row label={MODE_LABEL} description={MODE_DESCRIPTION}>
           <ModeToggle label={MODE_LABEL} />
         </Row>
       </div>
 
       {others.length > 0 && (
-        <div className="sl-sp-banner" role="status">
+        <div className="sl-us-banner" role="status">
           <span>
             {others.join(" and ")} still {others.length > 1 ? "change" : "changes"} your lyrics. Turn{" "}
             {others.length > 1 ? "them" : "it"} off to review.
@@ -49,20 +49,20 @@ export function ReviewerPane({ labelOf }: { labelOf: (id: string) => string | un
         </div>
       )}
 
-      <div className="sl-sp-group">
-        <h3 className="sl-sp-group-title">What it sets</h3>
-        <div className="sl-sp-reviewer-list">
+      <div className="sl-us-group">
+        <h3 className="sl-us-group-title">What it sets</h3>
+        <div className="sl-us-reviewer-list">
           {REVIEWER_SETTINGS.map(({ key, shown }) => (
             <Fragment key={key}>
-              <div className="sl-sp-reviewer-item">
+              <div className="sl-us-reviewer-item">
                 <span>{labelOf(key) ?? key}</span>
-                <span className="sl-sp-reviewer-value">{shown}</span>
+                <span className="sl-us-reviewer-value">{shown}</span>
               </div>
               {/* Kept apart from the settings, so the mode skips them rather than resetting them. */}
               {key === "playbackOffset" && (
-                <div className="sl-sp-reviewer-item">
+                <div className="sl-us-reviewer-item">
                   <span>Per-song Offsets</span>
-                  <span className="sl-sp-reviewer-value">Ignored</span>
+                  <span className="sl-us-reviewer-value">Ignored</span>
                 </div>
               )}
             </Fragment>
@@ -72,15 +72,15 @@ export function ReviewerPane({ labelOf }: { labelOf: (id: string) => string | un
           {REVIEWER_EXPERIMENTS_OFF.map((id) => getExperiment(id))
             .filter((experiment) => !experiment.hidden)
             .map((experiment) => (
-              <div key={experiment.id} className="sl-sp-reviewer-item">
+              <div key={experiment.id} className="sl-us-reviewer-item">
                 <span>{experiment.label}</span>
-                <span className="sl-sp-reviewer-value">{experiment.forceState === true ? "Forced on" : "Off"}</span>
+                <span className="sl-us-reviewer-value">{experiment.forceState === true ? "Forced on" : "Off"}</span>
               </div>
             ))}
           {defaulted.length > 0 && (
-            <div className="sl-sp-reviewer-item">
+            <div className="sl-us-reviewer-item">
               <span>Other experiments</span>
-              <span className="sl-sp-reviewer-value">Default</span>
+              <span className="sl-us-reviewer-value">Default</span>
             </div>
           )}
         </div>

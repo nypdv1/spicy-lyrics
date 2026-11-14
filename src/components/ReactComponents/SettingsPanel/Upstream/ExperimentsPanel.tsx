@@ -86,13 +86,13 @@ export function SyncStatus() {
   const spinning = useTrailing(syncing, SPIN_TRAIL_MS);
   return (
     <span
-      className="sl-sp-sync-status"
+      className="sl-us-sync-status"
       data-visible={syncing || undefined}
       data-spinning={spinning || undefined}
       role="status"
       aria-hidden={!syncing}
     >
-      <span className="sl-sp-sync-spinner" aria-hidden="true" />
+      <span className="sl-us-sync-spinner" aria-hidden="true" />
       Checking for changes
     </span>
   );
@@ -137,7 +137,7 @@ export function ExperimentRow({
     const target =
       forced !== undefined
         ? badgeRef.current
-        : rowRef.current?.closest(".sl-sp-pane")?.querySelector(".sl-sp-sync-status");
+        : rowRef.current?.closest(".sl-us-pane")?.querySelector(".sl-us-sync-status");
     target?.animate(FLASH, FLASH_TIMING);
   };
 
@@ -145,7 +145,7 @@ export function ExperimentRow({
     forced === undefined ? undefined : (
       <span
         ref={badgeRef}
-        className="sl-sp-forced-badge"
+        className="sl-us-forced-badge"
         title="Set by Spicy Lyrics, so it can't be changed here."
       >
         <svg width="9" height="10" viewBox="0 0 9 10" fill="none" aria-hidden="true">
@@ -169,7 +169,7 @@ export function ExperimentRow({
       disabledReason={searching ? REVIEWER_LOCK_REASON : undefined}
       note={(enabled && conflict) || undefined}
     >
-      <div className="sl-sp-sync-gate" data-syncing={syncing || undefined} ref={rowRef}>
+      <div className="sl-us-sync-gate" data-syncing={syncing || undefined} ref={rowRef}>
         <Toggle
           label={experiment.label}
           checked={enabled}

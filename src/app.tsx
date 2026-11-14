@@ -13,6 +13,9 @@ import "./css/Lyrics/ScrollToActive.css";
 import "./css/Loaders/LoaderContainer.css";
 import "./css/Loaders/LyricsSkeleton.css";
 import "./css/font-pack/font-pack.css";
+// The selectable upstream panel uses its own class namespace, so it cannot inherit
+// the fork's classic settings rules when both layouts are bundled.
+import "./css/settings-panel-upstream.css";
 
 import ApplyDynamicBackground, {
   getBackgroundStyle,

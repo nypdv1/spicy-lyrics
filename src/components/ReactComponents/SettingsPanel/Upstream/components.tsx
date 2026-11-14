@@ -37,29 +37,29 @@ export function Row({
   aside?: React.ReactNode;
 }) {
   const labelWrap = (
-    <div className="sl-sp-label-wrap">
-      <span className="sl-sp-label">
+    <div className="sl-us-label-wrap">
+      <span className="sl-us-label">
         {label}
         {badge}
       </span>
-      {description && <span className="sl-sp-description">{description}</span>}
-      {disabled && disabledReason && <span className="sl-sp-reason">{disabledReason}</span>}
-      {note && <span className="sl-sp-reason">{note}</span>}
+      {description && <span className="sl-us-description">{description}</span>}
+      {disabled && disabledReason && <span className="sl-us-reason">{disabledReason}</span>}
+      {note && <span className="sl-us-reason">{note}</span>}
     </div>
   );
   return (
     <div
-      className={`sl-sp-row${disabled ? " sl-sp-row--disabled" : ""}${stacked ? " sl-sp-row--stacked" : ""}`}
+      className={`sl-us-row${disabled ? " sl-us-row--disabled" : ""}${stacked ? " sl-us-row--stacked" : ""}`}
     >
       {aside ? (
-        <div className="sl-sp-row-head">
+        <div className="sl-us-row-head">
           {labelWrap}
-          <div className="sl-sp-row-aside">{aside}</div>
+          <div className="sl-us-row-aside">{aside}</div>
         </div>
       ) : (
         labelWrap
       )}
-      <div className="sl-sp-control">{children}</div>
+      <div className="sl-us-control">{children}</div>
     </div>
   );
 }
@@ -78,7 +78,7 @@ export function Highlight({ text, query }: { text: string; query: string }) {
       {parts.map((part, i) =>
         // split() with one capture group puts the matches at the odd indices.
         i % 2 === 1 ? (
-          <mark key={i} className="sl-sp-mark">
+          <mark key={i} className="sl-us-mark">
             {part}
           </mark>
         ) : (
@@ -134,7 +134,7 @@ export function Toggle({
 
   return (
     <label
-      className={`sl-sp-toggle${locked ? " sl-sp-toggle--locked" : ""}${busy ? " sl-sp-toggle--busy" : ""}`}
+      className={`sl-us-toggle${locked ? " sl-us-toggle--locked" : ""}${busy ? " sl-us-toggle--busy" : ""}`}
       onPointerDown={frozen ? nudge : undefined}
     >
       <input
@@ -145,7 +145,7 @@ export function Toggle({
         disabled={frozen || disabled}
         onChange={(e) => onChange(e.currentTarget.checked)}
       />
-      <span className="sl-sp-toggle-track" ref={trackRef} />
+      <span className="sl-us-toggle-track" ref={trackRef} />
     </label>
   );
 }
@@ -182,7 +182,7 @@ export function Select({
   disabled?: boolean;
   label?: string;
 }) {
-  const listId = `sl-sp-listbox-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  const listId = `sl-us-listbox-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const optionId = (i: number) => `${listId}-${i}`;
   const labelOf = (i: number) => labels?.[i] ?? options[i];
   const selected = Math.max(0, options.indexOf(value));
@@ -366,7 +366,7 @@ export function Select({
       <button
         ref={triggerRef}
         type="button"
-        className="sl-sp-select"
+        className="sl-us-select"
         role="combobox"
         aria-label={label}
         aria-haspopup="listbox"
@@ -381,21 +381,21 @@ export function Select({
       >
         {/* Every label sits in one grid cell, so the button is as wide as the longest one and
             never changes width when the choice does. */}
-        <span className="sl-sp-select-value">
+        <span className="sl-us-select-value">
           {options.map((opt, i) => (
             <span key={opt} data-current={i === selected || undefined} aria-hidden={i !== selected || undefined}>
               {labelOf(i)}
             </span>
           ))}
         </span>
-        <svg className="sl-sp-select-chevron" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
+        <svg className="sl-us-select-chevron" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
           <path d="M2 3.75 5 6.75 8 3.75" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
       <ul
         ref={listRef}
         id={listId}
-        className="sl-sp-listbox"
+        className="sl-us-listbox"
         role="listbox"
         aria-label={label}
         popover="manual"
@@ -408,14 +408,14 @@ export function Select({
             key={opt}
             id={optionId(i)}
             role="option"
-            className="sl-sp-option"
+            className="sl-us-option"
             aria-selected={i === selected}
             data-active={(open && i === active) || undefined}
             onPointerMove={() => active !== i && setActive(i)}
             onClick={() => commit(i)}
           >
             <span>{labelOf(i)}</span>
-            <svg className="sl-sp-option-check" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+            <svg className="sl-us-option-check" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
               <path d="M2.5 6.25 5 8.75 9.5 3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </li>
@@ -490,7 +490,7 @@ export function Slider({
   // until it's let go. The window hears the release even off the thumb.
   const peekWhileDragging = (event: React.PointerEvent<HTMLInputElement>) => {
     if (event.button !== 0) return;
-    peek.start(event.currentTarget.closest<HTMLElement>(".sl-sp-row"));
+    peek.start(event.currentTarget.closest<HTMLElement>(".sl-us-row"));
     const release = () => {
       peek.end();
       window.removeEventListener("pointerup", release, true);
@@ -507,7 +507,7 @@ export function Slider({
   const nudge = (by: number) => (
     <button
       type="button"
-      className="sl-sp-slider-nudge"
+      className="sl-us-slider-nudge"
       onClick={() => commit(clamped + by)}
       disabled={disabled}
     >
@@ -516,14 +516,14 @@ export function Slider({
   );
 
   return (
-    <div className={`sl-sp-slider${disabled ? " sl-sp-slider--disabled" : ""}`}>
-      <div className="sl-sp-slider-track-wrap">
-        <span className="sl-sp-slider-track" />
-        <span className="sl-sp-slider-fill" style={fillStyle} />
-        {isBipolar && <span className="sl-sp-slider-center" style={{ left: posFor(zeroFrac) }} />}
+    <div className={`sl-us-slider${disabled ? " sl-us-slider--disabled" : ""}`}>
+      <div className="sl-us-slider-track-wrap">
+        <span className="sl-us-slider-track" />
+        <span className="sl-us-slider-fill" style={fillStyle} />
+        {isBipolar && <span className="sl-us-slider-center" style={{ left: posFor(zeroFrac) }} />}
         <input
           type="range"
-          className="sl-sp-slider-input"
+          className="sl-us-slider-input"
           aria-label={label}
           aria-valuetext={valueLabel}
           min={min}
@@ -535,9 +535,9 @@ export function Slider({
           disabled={disabled}
         />
       </div>
-      <div className={`sl-sp-slider-meta${nudges ? " sl-sp-slider-meta--nudges" : ""}`}>
+      <div className={`sl-us-slider-meta${nudges ? " sl-us-slider-meta--nudges" : ""}`}>
         {nudges ? (
-          <div className="sl-sp-slider-nudges">
+          <div className="sl-us-slider-nudges">
             {nudge(-nudges[1])}
             {nudge(-nudges[0])}
             {editable ? (
@@ -550,7 +550,7 @@ export function Slider({
                 onCommit={commit}
               />
             ) : (
-              <span className="sl-sp-slider-value">{valueLabel}</span>
+              <span className="sl-us-slider-value">{valueLabel}</span>
             )}
             {nudge(nudges[0])}
             {nudge(nudges[1])}
@@ -565,12 +565,12 @@ export function Slider({
             onCommit={commit}
           />
         ) : (
-          <span className="sl-sp-slider-value">{valueLabel}</span>
+          <span className="sl-us-slider-value">{valueLabel}</span>
         )}
         {changed && !disabled && (
           <button
             type="button"
-            className="sl-sp-slider-reset"
+            className="sl-us-slider-reset"
             onClick={() => onChange(defaultValue!)}
           >
             Reset
@@ -613,11 +613,11 @@ function SliderValueInput({
   };
 
   return (
-    <label className="sl-sp-slider-value sl-sp-slider-value--editable">
+    <label className="sl-us-slider-value sl-us-slider-value--editable">
       <input
         type="text"
         inputMode="numeric"
-        className="sl-sp-slider-value-input"
+        className="sl-us-slider-value-input"
         aria-label={label}
         value={draft}
         size={Math.max(draft.length, 2)}
@@ -637,7 +637,7 @@ function SliderValueInput({
           e.currentTarget.blur();
         }}
       />
-      {unit && <span className="sl-sp-slider-value-unit">{unit}</span>}
+      {unit && <span className="sl-us-slider-value-unit">{unit}</span>}
     </label>
   );
 }
@@ -694,7 +694,7 @@ export function Segmented<T extends string>({
 
   return (
     <div
-      className="sl-sp-segmented"
+      className="sl-us-segmented"
       role="radiogroup"
       aria-label={label}
       aria-disabled={disabled || undefined}
@@ -705,7 +705,7 @@ export function Segmented<T extends string>({
       onPointerDown={() => setInstant(false)}
     >
       <span
-        className="sl-sp-segmented-thumb"
+        className="sl-us-segmented-thumb"
         aria-hidden="true"
         style={{
           width: `calc((100% - 4px) / ${options.length})`,
@@ -720,7 +720,7 @@ export function Segmented<T extends string>({
           }}
           type="button"
           role="radio"
-          className="sl-sp-segmented-option"
+          className="sl-us-segmented-option"
           aria-checked={i === picked}
           tabIndex={i === picked ? 0 : -1}
           disabled={disabled || opt.disabled}
@@ -743,9 +743,9 @@ export const SearchBar = forwardRef<
   }
 >(function SearchBar({ value, onChange, onKeyDown, placeholder = "Search settings" }, ref) {
   return (
-    <div className="sl-sp-search-wrap">
+    <div className="sl-us-search-wrap">
       <svg
-        className="sl-sp-search-icon"
+        className="sl-us-search-icon"
         width="14"
         height="14"
         viewBox="0 0 14 14"
@@ -766,7 +766,7 @@ export const SearchBar = forwardRef<
       </svg>
       <input
         ref={ref}
-        className="sl-sp-search"
+        className="sl-us-search"
         type="search"
         aria-label="Search all settings"
         placeholder={placeholder}
@@ -778,7 +778,7 @@ export const SearchBar = forwardRef<
       {value && (
         <button
           type="button"
-          className="sl-sp-search-clear"
+          className="sl-us-search-clear"
           onClick={() => onChange("")}
           aria-label="Clear search"
         >

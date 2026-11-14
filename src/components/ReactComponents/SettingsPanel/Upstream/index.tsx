@@ -88,7 +88,7 @@ function SettingRow({ def, query }: { def: SettingDef; query: string }) {
       aside={Aside && <Aside disabled={!!reason} />}
     >
       {/* Not every Control passes `disabled` on; this holds them all, keyboard included. */}
-      <fieldset className="sl-sp-control-lock" disabled={!!reason}>
+      <fieldset className="sl-us-control-lock" disabled={!!reason}>
         <Control disabled={!!reason} label={def.label} />
       </fieldset>
     </Row>
@@ -261,21 +261,21 @@ export default function SettingsPanel() {
         }}
         type="button"
         role="tab"
-        id={`sl-sp-tab-${s.id}`}
+        id={`sl-us-tab-${s.id}`}
         aria-selected={active}
-        aria-controls="sl-sp-panel"
+        aria-controls="sl-us-panel"
         tabIndex={s.id === tab ? 0 : -1}
-        className="sl-sp-tab"
+        className="sl-us-tab"
         data-active={active || undefined}
         data-empty={count === 0 || undefined}
         onClick={() => select(s.id)}
       >
-        <span className="sl-sp-tab-icon">{s.icon}</span>
-        <span className="sl-sp-tab-label">{s.title}</span>
-        {count !== null && count > 0 && <span className="sl-sp-tab-count">{count}</span>}
-        {s.id === "reviewer" && reviewerOn && <span className="sl-sp-tab-dot" aria-label="TTML Reviewer is on" />}
+        <span className="sl-us-tab-icon">{s.icon}</span>
+        <span className="sl-us-tab-label">{s.title}</span>
+        {count !== null && count > 0 && <span className="sl-us-tab-count">{count}</span>}
+        {s.id === "reviewer" && reviewerOn && <span className="sl-us-tab-dot" aria-label="TTML Reviewer is on" />}
         {count === null && s.id === "about" && updateStatus === "outdated" && (
-          <span className="sl-sp-tab-dot" aria-label="Update available" />
+          <span className="sl-us-tab-dot" aria-label="Update available" />
         )}
       </button>
     );
@@ -287,32 +287,32 @@ export default function SettingsPanel() {
 
   return (
     <PeekContext.Provider value={peekControls}>
-    <div className="sl-sp" ref={rootRef}>
-      <nav className="sl-sp-sidebar" aria-label="Settings sections">
-        <div className="sl-sp-brand">
-          <span className="sl-sp-brand-line">Spicy Lyrics</span>
-          <h1 className="sl-sp-title">Settings</h1>
+    <div className="sl-us" ref={rootRef}>
+      <nav className="sl-us-sidebar" aria-label="Settings sections">
+        <div className="sl-us-brand">
+          <span className="sl-us-brand-line">Spicy Lyrics</span>
+          <h1 className="sl-us-title">Settings</h1>
         </div>
 
         <SearchBar ref={searchRef} value={query} onChange={onQueryChange} />
 
         <div
-          className="sl-sp-tabs"
+          className="sl-us-tabs"
           role="tablist"
           aria-orientation="vertical"
           onKeyDown={onTabKeyDown}
         >
           {SECTIONS.filter((s) => !s.secondary).map(renderTab)}
-          <div className="sl-sp-tabs-divider" role="presentation" />
+          <div className="sl-us-tabs-divider" role="presentation" />
           {SECTIONS.filter((s) => s.secondary).map(renderTab)}
         </div>
       </nav>
 
-      <section className="sl-sp-pane">
-        <div className="sl-sp-pane-header" ref={headerRef}>
-          <h2 className="sl-sp-pane-title">{searching ? "Results" : section.title}</h2>
+      <section className="sl-us-pane">
+        <div className="sl-us-pane-header" ref={headerRef}>
+          <h2 className="sl-us-pane-title">{searching ? "Results" : section.title}</h2>
           {searching ? (
-            <span className="sl-sp-pane-count">
+            <span className="sl-us-pane-count">
               {hitCount === 1 ? "1 setting" : `${hitCount} settings`}
             </span>
           ) : (
@@ -321,7 +321,7 @@ export default function SettingsPanel() {
           {canPeek && (
             <button
               type="button"
-              className="sl-sp-peek"
+              className="sl-us-peek"
               aria-label="Peek at the lyrics"
               title="Hold to see the lyrics behind the settings"
               aria-pressed={peek !== null && peek.keep === null}
@@ -349,7 +349,7 @@ export default function SettingsPanel() {
           )}
           <button
             type="button"
-            className="sl-sp-close"
+            className="sl-us-close"
             aria-label="Close settings"
             onClick={() => PopupModal.hide()}
           >
@@ -358,32 +358,32 @@ export default function SettingsPanel() {
         </div>
 
         <div
-          className="sl-sp-pane-scroll"
+          className="sl-us-pane-scroll"
           ref={scrollRef}
           onScroll={onScroll}
-          id="sl-sp-panel"
+          id="sl-us-panel"
           role="tabpanel"
-          aria-labelledby={searching ? undefined : `sl-sp-tab-${tab}`}
+          aria-labelledby={searching ? undefined : `sl-us-tab-${tab}`}
           aria-label={searching ? "Search results" : undefined}
         >
           <div
             key={searching ? "search" : tab}
-            className="sl-sp-pane-body"
+            className="sl-us-pane-body"
             data-instant={instant || undefined}
           >
             {searching ? (
               hits.length > 0 ? (
                 hits.map(({ section: s, settings }) => (
-                  <div className="sl-sp-group" key={s.id}>
+                  <div className="sl-us-group" key={s.id}>
                     <button
                       type="button"
-                      className="sl-sp-group-title sl-sp-group-link"
+                      className="sl-us-group-title sl-us-group-link"
                       onClick={() => select(s.id)}
                     >
                       {s.title}
                       {ChevronIcon}
                     </button>
-                    <div className="sl-sp-card">
+                    <div className="sl-us-card">
                       {settings.map((def) => (
                         <SettingRow key={def.id} def={def} query={query} />
                       ))}
@@ -391,9 +391,9 @@ export default function SettingsPanel() {
                   </div>
                 ))
               ) : (
-                <div className="sl-sp-empty">
-                  <p className="sl-sp-empty-title">No results for “{query.trim()}”</p>
-                  <p className="sl-sp-empty-hint">Check the spelling, or try a shorter word.</p>
+                <div className="sl-us-empty">
+                  <p className="sl-us-empty-title">No results for “{query.trim()}”</p>
+                  <p className="sl-us-empty-hint">Check the spelling, or try a shorter word.</p>
                 </div>
               )
             ) : section.id === "about" ? (
@@ -404,14 +404,14 @@ export default function SettingsPanel() {
               <BugReportPane />
             ) : (
               <>
-                {section.intro && <p className="sl-sp-intro">{section.intro}</p>}
+                {section.intro && <p className="sl-us-intro">{section.intro}</p>}
                 {/* Experiment rows are all held at once, so the tab says it once, not per row. */}
-                {section.id === "experiments" && reviewerOn && <p className="sl-sp-intro">{REVIEWER_LOCK_REASON}</p>}
+                {section.id === "experiments" && reviewerOn && <p className="sl-us-intro">{REVIEWER_LOCK_REASON}</p>}
                 {hasRows ? (
                   groups.map((group, i) => (
-                    <div className="sl-sp-group" key={group.title ?? i}>
-                      {group.title && <h3 className="sl-sp-group-title">{group.title}</h3>}
-                      <div className="sl-sp-card">
+                    <div className="sl-us-group" key={group.title ?? i}>
+                      {group.title && <h3 className="sl-us-group-title">{group.title}</h3>}
+                      <div className="sl-us-card">
                         {group.settings.map((def) => (
                           <SettingRow key={def.id} def={def} query="" />
                         ))}
@@ -419,8 +419,8 @@ export default function SettingsPanel() {
                     </div>
                   ))
                 ) : (
-                  <div className="sl-sp-empty">
-                    <p className="sl-sp-empty-title">{section.emptyText ?? "Nothing here yet."}</p>
+                  <div className="sl-us-empty">
+                    <p className="sl-us-empty-title">{section.emptyText ?? "Nothing here yet."}</p>
                   </div>
                 )}
               </>

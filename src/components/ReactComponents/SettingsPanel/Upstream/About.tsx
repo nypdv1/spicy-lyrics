@@ -60,7 +60,7 @@ export function useUpdateStatus(): UpdateStatus {
 function ExternalArrow() {
   return (
     <svg
-      className="sl-sp-about-arrow"
+      className="sl-us-about-arrow"
       width="10"
       height="10"
       viewBox="0 0 10 10"
@@ -84,17 +84,17 @@ export default function About({ status }: { status: UpdateStatus }) {
   const build = App.isDev() ? "dev" : "public";
 
   return (
-    <div className="sl-sp-about">
-      <div className="sl-sp-about-hero">
-        <span className="sl-sp-about-wordmark">Spicy Lyrics</span>
-        <div className="sl-sp-about-status-row">
-          <span className="sl-sp-about-version">Version {version}</span>
+    <div className="sl-us-about">
+      <div className="sl-us-about-hero">
+        <span className="sl-us-about-wordmark">Spicy Lyrics</span>
+        <div className="sl-us-about-status-row">
+          <span className="sl-us-about-version">Version {version}</span>
           {(status === "latest" || status === "outdated") && (
             <>
-              <span className="sl-sp-about-sep" aria-hidden="true">
+              <span className="sl-us-about-sep" aria-hidden="true">
                 ·
               </span>
-              <span className={`sl-sp-about-status sl-sp-about-status--${status}`}>
+              <span className={`sl-us-about-status sl-us-about-status--${status}`}>
                 {status === "latest" ? "Up to date" : "Update available"}
               </span>
             </>
@@ -102,24 +102,24 @@ export default function About({ status }: { status: UpdateStatus }) {
           {status === "outdated" && (
             <button
               type="button"
-              className="sl-sp-about-update"
+              className="sl-us-about-update"
               onClick={() => Session.Navigate({ pathname: "/SpicyLyrics/Update" })}
             >
               Update
             </button>
           )}
         </div>
-        <span className="sl-sp-about-build">
-          Build <span className="sl-sp-about-build-value">{build}</span>
+        <span className="sl-us-about-build">
+          Build <span className="sl-us-about-build-value">{build}</span>
         </span>
       </div>
 
-      <div className="sl-sp-about-links">
+      <div className="sl-us-about-links">
         {LINKS.map(({ label, url, brand }) => (
           <button
             key={label}
             type="button"
-            className={`sl-sp-about-link${brand ? " sl-sp-about-link--brand" : ""}`}
+            className={`sl-us-about-link${brand ? " sl-us-about-link--brand" : ""}`}
             style={brand ? ({ "--brand": brand } as React.CSSProperties) : undefined}
             onClick={() => window.open(url, "_blank")}
           >

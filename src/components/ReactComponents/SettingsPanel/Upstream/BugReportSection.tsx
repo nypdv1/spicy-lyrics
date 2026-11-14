@@ -44,9 +44,9 @@ function CopyLabel({ state, idle }: { state: CopyState; idle: string }) {
     ["failed", "Couldn't copy"],
   ];
   return (
-    <span className="sl-sp-bug-faces">
+    <span className="sl-us-bug-faces">
       {faces.map(([face, text]) => (
-        <span key={face} className="sl-sp-bug-face" aria-hidden={face !== state} data-shown={face === state}>
+        <span key={face} className="sl-us-bug-face" aria-hidden={face !== state} data-shown={face === state}>
           {text}
         </span>
       ))}
@@ -58,7 +58,7 @@ function CopyLabel({ state, idle }: { state: CopyState; idle: string }) {
 function CopyReportButton() {
   const [state, copy] = useCopy();
   return (
-    <button type="button" className="sl-sp-btn" data-state={state} onClick={(e) => copy(e.currentTarget)}>
+    <button type="button" className="sl-us-btn" data-state={state} onClick={(e) => copy(e.currentTarget)}>
       <CopyLabel state={state} idle="Copy" />
     </button>
   );
@@ -86,20 +86,20 @@ export function BugReportPane() {
   const preview = report.split("\n").filter((line) => line !== "```" && !line.startsWith("**")).slice(0, -1);
 
   return (
-    <div className="sl-sp-bug">
-      <p className="sl-sp-intro">
+    <div className="sl-us-bug">
+      <p className="sl-us-intro">
         Copy your setup and post it in #extension-bugs on our Discord, with what went wrong. It tells us what we'd
         otherwise have to ask.
       </p>
 
       {outdated && (
-        <div className="sl-sp-banner" role="status">
+        <div className="sl-us-banner" role="status">
           <span>
             You're on {current}, and {latestVersion} is out. Update first: it may already be fixed.
           </span>
           <button
             type="button"
-            className="sl-sp-about-update"
+            className="sl-us-about-update"
             onClick={() => Session.Navigate({ pathname: "/SpicyLyrics/Update" })}
           >
             Update
@@ -107,10 +107,10 @@ export function BugReportPane() {
         </div>
       )}
 
-      <div className="sl-sp-bug-actions">
+      <div className="sl-us-bug-actions">
         <button
           type="button"
-          className="sl-sp-about-link sl-sp-bug-primary"
+          className="sl-us-about-link sl-us-bug-primary"
           data-state={discordState}
           onClick={(e) => copyAndOpen(e.currentTarget)}
         >
@@ -118,7 +118,7 @@ export function BugReportPane() {
         </button>
         <button
           type="button"
-          className="sl-sp-about-link"
+          className="sl-us-about-link"
           data-state={copyState}
           onClick={(e) => copy(e.currentTarget)}
         >
@@ -126,21 +126,21 @@ export function BugReportPane() {
         </button>
       </div>
 
-      <div className="sl-sp-bug-fineprint">
+      <div className="sl-us-bug-fineprint">
         <p>No account details, user IDs or tokens are included.</p>
         <p>
           Not in the server yet?{" "}
-          <button type="button" className="sl-sp-bug-join-link" onClick={() => window.open(DISCORD_INVITE_URL, "_blank")}>
+          <button type="button" className="sl-us-bug-join-link" onClick={() => window.open(DISCORD_INVITE_URL, "_blank")}>
             Join here
           </button>
         </p>
       </div>
 
-      <div className="sl-sp-group">
-        <h3 className="sl-sp-group-title">What gets copied</h3>
-        <div className="sl-sp-bug-preview">
+      <div className="sl-us-group">
+        <h3 className="sl-us-group-title">What gets copied</h3>
+        <div className="sl-us-bug-preview">
           {preview.map((line, i) => (
-            <div key={i} className="sl-sp-bug-line">
+            <div key={i} className="sl-us-bug-line">
               {line}
             </div>
           ))}

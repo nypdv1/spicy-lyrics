@@ -31,9 +31,10 @@ const MUSIC_VIDEO_CLASS = "MusicVideoStage";
 // Keep a short handoff window, but release promptly when the video has really
 // ended so Canvas and motion artwork can immediately take back the NowBar and stage.
 const MUSIC_VIDEO_INACTIVE_GRACE_MS = 750;
-// Let Spicy Themes evaluate a new song before one of our <video>s enters the
-// page. Its own-video detector latches a match for the rest of that track.
-const MUSIC_VIDEO_PROBE_MS = 2500;
+// Give Spicy Themes one event turn to attach an MV on a new song. Canvas slots
+// are removed from its scan now, so this only needs to cover the handoff rather
+// than holding the stage for seconds.
+const MUSIC_VIDEO_PROBE_MS = 250;
 // Matches --CanvasFade in CanvasImmersive.css.
 const FADE_MS = 900;
 const AMBIENT_WIDTH = 80;

@@ -27,6 +27,7 @@ import { captureLyricsViewportAnchor, triggerRemeasureLV } from "../LyricsVirtua
 import { UpdateStaticLyricsRomanization } from "../Applyer/Static.ts";
 import { UpdateLineLyricsRomanization } from "../Applyer/Synced/Line.ts";
 import { UpdateSyllableLyricsRomanization } from "../Applyer/Synced/Syllable.ts";
+import { RomanizeUnderLine } from "../Applyer/Utils/RomanizedRow.ts";
 import { needsDefaultLyricsFont } from "../LyricsFontFallback.ts";
 
 /**
@@ -115,12 +116,15 @@ export function ShouldReapplyRenderedLyricsForSpaceGravity(enabled: boolean): bo
 export function UpdateRenderedRomanization(useRomanized: boolean): boolean {
   if (!renderedLyrics) return false;
 
+  // Under each line, the lines keep their own text and the rows below them open
+  // or close (RomanizedRowsShown on the page), so only "Replace the line" swaps text.
+  const replaceText = useRomanized && !RomanizeUnderLine();
   if (renderedLyrics.Type === "Syllable") {
-    UpdateSyllableLyricsRomanization(useRomanized);
+    UpdateSyllableLyricsRomanization(replaceText);
   } else if (renderedLyrics.Type === "Line") {
-    UpdateLineLyricsRomanization(useRomanized);
+    UpdateLineLyricsRomanization(replaceText);
   } else if (renderedLyrics.Type === "Static") {
-    UpdateStaticLyricsRomanization(useRomanized);
+    UpdateStaticLyricsRomanization(replaceText);
   } else {
     return false;
   }

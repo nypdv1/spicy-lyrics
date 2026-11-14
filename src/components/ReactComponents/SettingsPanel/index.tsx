@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useStore } from "@nanostores/react";
 import { $allowHidingSettings, $hideHidingIcon } from "../../../utils/stores.ts";
 import AppearanceSection from "./AppearanceSection.tsx";
-import DeveloperSection from "./DeveloperSection.tsx";
+import DeveloperSection, { type SettingsSubPane } from "./DeveloperSection.tsx";
 import EffectsSection from "./EffectsSection.tsx";
 import InterfaceSection from "./InterfaceSection.tsx";
 import LyricsSection from "./LyricsSection.tsx";
@@ -21,7 +21,7 @@ const TABS = [
 ] as const;
 
 export type SettingsPanelState = { query: string; sectionFilter: string; scrollTop: number };
-export default function SettingsPanel({ onOpenHiddenSettings, onManageAnimator, initialState, onStateChange }: { onOpenHiddenSettings?: () => void; onManageAnimator?: (state: SettingsPanelState) => void; initialState?: SettingsPanelState; onStateChange?: (state: SettingsPanelState) => void }) {
+export default function SettingsPanel({ onOpenHiddenSettings, onOpenPane, onManageAnimator, initialState, onStateChange }: { onOpenHiddenSettings?: () => void; onOpenPane?: (pane: SettingsSubPane) => void; onManageAnimator?: (state: SettingsPanelState) => void; initialState?: SettingsPanelState; onStateChange?: (state: SettingsPanelState) => void }) {
   const [query, setQuery] = useState(initialState?.query ?? "");
   const [sectionFilter, setSectionFilter] = useState<string>(initialState?.sectionFilter ?? "Appearance");
   const allowHidingSettings = useStore($allowHidingSettings);
@@ -83,7 +83,7 @@ export default function SettingsPanel({ onOpenHiddenSettings, onManageAnimator, 
                 <EffectsSection query={query} sectionFilter={searching ? "All" : sectionFilter} onManageAnimator={() => onManageAnimator?.({ query, sectionFilter, scrollTop: scrollRef.current?.scrollTop ?? 0 })} />
                 <InterfaceSection query={query} sectionFilter={searching ? "All" : sectionFilter} />
                 <SourcesSection query={query} sectionFilter={searching ? "All" : sectionFilter} />
-                <DeveloperSection query={query} sectionFilter={searching ? "All" : sectionFilter} onOpenHiddenSettings={onOpenHiddenSettings ?? (() => {})} />
+                <DeveloperSection query={query} sectionFilter={searching ? "All" : sectionFilter} onOpenHiddenSettings={onOpenHiddenSettings ?? (() => {})} onOpenPane={onOpenPane} />
               </div>
             </ShowHiddenSettingsInSearchContext.Provider>
           </div>

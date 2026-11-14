@@ -12,6 +12,9 @@ import fetchLyrics, { getSongKey, SessionTTMLStore } from "../../../utils/Lyrics
 import { ApplyLyricsIfCurrent } from "../../../utils/Lyrics/Global/Applyer";
 import { $currentLyricsData } from "../../../utils/stores";
 import { $lastFetchedUri } from "../../../utils/uiState";
+import Logger from "../../../utils/Logger.ts";
+
+const lyricsManagerLogger = new Logger("Lyrics Manager");
 
 function sanitizeFilename(name: string): string {
   return name.replace(/[^a-zA-Z0-9_\- .]/g, "_").slice(0, 100);
@@ -96,7 +99,7 @@ export default function LyricsDBPanel({ onBack }: LyricsDBPanelProps) {
         .then((lyrics) => ApplyLyricsIfCurrent(uri, lyrics))
         .catch((err) => {
           toast.error("Error applying lyrics", { duration: 4000 });
-          console.error("Error applying lyrics:", err);
+          lyricsManagerLogger.error("Error applying lyrics", err);
         });
     }, 25);
   }

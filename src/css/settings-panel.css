@@ -1837,3 +1837,322 @@ sl-generic-modal.SpicyLyricsModal:not(.Exp_NewSettingsDesign) .sl-modal.slmodal-
     }
   }
 }
+
+
+/* TTML Reviewer and Bug Report panes (opened from Settings > Advanced). */
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay {
+.sl-sp-intro {
+    max-width: 62ch;
+    margin: 0 0 var(--space-5);
+    color: var(--color-text-secondary);
+    font-size: var(--text-caption-size) !important;
+    line-height: 1.45;
+  }
+}
+
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay {
+.sl-sp-group + .sl-sp-group {
+    margin-top: var(--space-6);
+  }
+}
+
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay {
+.sl-sp-group-title {
+    margin: 0 0 var(--space-2) 4px;
+    color: var(--color-text-secondary);
+    font-size: var(--text-caption-size) !important;
+    font-weight: var(--w-semibold);
+    letter-spacing: 0.01em;
+  }
+}
+
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay {
+.sl-sp-card {
+    border-radius: var(--radius-md);
+    background: var(--accent-tint-bg);
+    box-shadow: inset 0 0 0 1px var(--hairline);
+  }
+}
+
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay {
+.sl-sp-about-update {
+    border: none;
+    border-radius: var(--radius-pill);
+    padding: 3px 12px;
+    cursor: pointer;
+    background: rgba(255, 195, 120, 0.16);
+    color: var(--color-status-warning);
+    box-shadow: inset 0 0 0 1px rgba(255, 195, 120, 0.35);
+    font-size: var(--text-caption-size) !important;
+    font-weight: var(--w-semibold);
+    transition:
+      background var(--dur-fast) var(--ease-standard),
+      box-shadow var(--dur-fast) var(--ease-standard),
+      transform 0.12s var(--ease-out);
+
+    &:hover {
+      background: rgba(255, 195, 120, 0.26);
+      box-shadow: inset 0 0 0 1px rgba(255, 195, 120, 0.55);
+    }
+
+    &:active {
+      transform: scale(0.96);
+    }
+  }
+}
+
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay {
+.sl-sp-about-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: var(--tap-min);
+    padding: 0 var(--space-4);
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    background: var(--accent-tint-bg);
+    color: var(--color-text-primary);
+    box-shadow: inset 0 0 0 1px var(--hairline);
+    font-size: var(--text-body-size) !important;
+    font-weight: var(--w-semibold);
+    transition:
+      background var(--dur-fast) var(--ease-standard),
+      box-shadow var(--dur-fast) var(--ease-standard),
+      transform 0.12s var(--ease-out);
+
+    &:hover {
+      background: var(--accent-tint-bg-hover);
+      box-shadow: inset 0 0 0 1px var(--hairline-strong);
+    }
+
+    &:active {
+      transform: scale(0.97);
+    }
+
+    &.sl-sp-about-link--brand {
+      background: rgba(var(--brand), 0.14);
+      box-shadow: inset 0 0 0 1px rgba(var(--brand), 0.35);
+      color: rgb(var(--brand));
+
+      &:hover {
+        background: rgba(var(--brand), 0.24);
+        box-shadow: inset 0 0 0 1px rgba(var(--brand), 0.55);
+      }
+    }
+  }
+}
+
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay {
+.sl-sp-reviewer {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+
+    .sl-sp-intro {
+      margin-bottom: 0;
+    }
+  }
+}
+
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay {
+.sl-sp-reviewer-list {
+    padding: 6px var(--space-4);
+    border-radius: var(--radius-md);
+    background: var(--accent-tint-bg);
+    box-shadow: inset 0 0 0 1px var(--hairline);
+    color: var(--color-text-secondary);
+    font-size: var(--text-caption-size) !important;
+  }
+}
+
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay {
+.sl-sp-reviewer-item {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-4);
+    padding: 5px 0;
+  }
+}
+
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay {
+.sl-sp-reviewer-value {
+    flex-shrink: 0;
+    color: var(--color-text-primary);
+    font-weight: var(--w-medium);
+  }
+}
+
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay {
+.sl-sp-bug {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+
+    .sl-sp-intro {
+      margin-bottom: 0;
+    }
+  }
+}
+
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay {
+.sl-sp-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    padding: 12px var(--space-4);
+    border-radius: var(--radius-md);
+    background: rgba(255, 195, 120, 0.1);
+    box-shadow: inset 0 0 0 1px rgba(255, 195, 120, 0.3);
+    color: var(--color-text-primary);
+    font-size: var(--text-caption-size) !important;
+    line-height: 1.45;
+
+    .sl-sp-about-update {
+      flex-shrink: 0;
+    }
+  }
+}
+
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay {
+.sl-sp-bug-preview {
+    margin: 0;
+    padding: 14px var(--space-4);
+    border-radius: var(--radius-md);
+    background: var(--accent-tint-bg);
+    box-shadow: inset 0 0 0 1px var(--hairline);
+    color: var(--color-text-secondary);
+    font-family: ui-monospace, "Cascadia Mono", Consolas, "SF Mono", Menlo, monospace !important;
+    font-size: 12px !important;
+    line-height: 1.6;
+    user-select: text;
+  }
+}
+
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay {
+.sl-sp-bug-line {
+    padding-left: 15ch;
+    text-indent: -15ch;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+}
+
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay {
+.sl-sp-bug-fineprint {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: calc(var(--space-2) * -1) 0 0 4px;
+    color: var(--color-text-tertiary);
+    font-size: var(--text-caption-size) !important;
+
+    p {
+      margin: 0;
+    }
+  }
+}
+
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay {
+.sl-sp-bug-faces {
+    display: inline-grid;
+  }
+}
+
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay {
+.sl-sp-bug-face {
+    grid-area: 1 / 1;
+    text-align: center;
+
+    &[data-shown="false"] {
+      visibility: hidden;
+    }
+  }
+}
+
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay {
+.sl-sp-bug-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+}
+
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay {
+.sl-sp-about-link.sl-sp-bug-primary {
+    background: var(--sl-sp-cta, var(--color-text-primary));
+    color: var(--sl-sp-cta-ink, #1a1a1a);
+    box-shadow: none;
+
+    &:hover {
+      background: var(--sl-sp-cta, var(--color-text-primary));
+      box-shadow: none;
+      filter: brightness(1.06);
+    }
+  }
+}
+
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay {
+.sl-sp-bug-join-link {
+    padding: 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: var(--color-text-secondary);
+    font: inherit;
+    font-weight: var(--w-semibold);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    transition: color var(--dur-fast) ease;
+
+    &:hover {
+      color: var(--color-text-primary);
+    }
+  }
+}
+
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay {
+.sl-sp-sidebar,
+  .sl-sp-pane-title,
+  .sl-sp-pane-count,
+  .sl-sp-pane-scroll,
+  .sl-sp-intro,
+  .sl-sp-group-title,
+  .sl-sp-row,
+  .sl-sp-empty {
+    transition: opacity 0.18s var(--ease-out, ease);
+  }
+}
+
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay {
+&[data-peek="row"] {
+:is(.sl-sp-sidebar, .sl-sp-pane-header, .sl-sp-intro, .sl-sp-group-title, .sl-sp-empty) {
+      opacity: 0;
+    }
+}
+}
+
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay {
+&[data-peek="row"] {
+.sl-sp-card {
+      background: transparent;
+      box-shadow: none;
+    }
+}
+}
+
+/* Experiment lists group their rows under a heading per category. */
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay {
+  .sl-sp-experiment-group + .sl-sp-experiment-group {
+    margin-top: var(--space-4);
+  }
+
+  .sl-sp-experiment-group-title {
+    margin: var(--space-2) 0 var(--space-2) 4px;
+    color: var(--color-text-secondary);
+    font-size: var(--text-caption-size) !important;
+    font-weight: var(--w-semibold);
+    letter-spacing: 0.01em;
+  }
+}

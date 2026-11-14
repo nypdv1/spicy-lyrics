@@ -1,6 +1,8 @@
 type SyllableEntry = {
   Text: string;
   TransliteratedText?: string;
+  /** Set (to false) only where the romanization ends a word the source text runs on. */
+  TransliteratedIsPartOfWord?: boolean;
   StartTime: number;
   EndTime: number;
   IsPartOfWord: boolean;
@@ -16,6 +18,8 @@ type RomanizedPiece = {
   Text: string;
   StartTime: number | null;
   EndTime: number | null;
+  /** Whether a romanized word ends with this piece. */
+  EndsWord: boolean;
 };
 
 type RomanizationMetadata = {
@@ -39,6 +43,80 @@ let timingContext = { frameRate: 30, tickRate: 1 };
 const WRITER_KEY_MATCH = /(songwriter|writers?|written[\s_-]*by|lyricist|composer)/i;
 const LEADING_BG_BRACKET = /^[([{]\s*/;
 const TRAILING_BG_BRACKET = /\s*[)\]}]$/;
+
+/**
+ * Romanized pieces from sibling spans. A piece ends a romanized word when its own text
+ * ends in whitespace, when whitespace sits between it and the next span, or when the
+ * next span's text starts with whitespace. That spacing is the only record of where
+ * romanized words end for a script written without spaces. The last piece always ends one.
+ */
+function readRomanizedPieces(spans: Element[]): RomanizedPiece[] {
+  const pieces: RomanizedPiece[] = [];
+  spans.forEach((span, index) => {
+    const raw = span.textContent ?? "";
+    const text = raw.trim();
+    if (!text) return;
+    const next = spans[index + 1];
+    let gap = false;
+    for (let node = span.nextSibling; node && node !== next; node = node.nextSibling) {
+      if (node.nodeType === Node.TEXT_NODE && /\s/.test(node.textContent ?? "")) gap = true;
+    }
+    pieces.push({
+      Text: text,
+      StartTime: parseTimestamp(getAttr(span, "begin")),
+      EndTime: parseTimestamp(getAttr(span, "end")),
+      EndsWord: !next || /\s$/.test(raw) || gap || /^\s/.test(next.textContent ?? ""),
+    });
+  });
+  return pieces;
+}
+
+/** A span's times, NaN where one is missing. An end before its begin counts as missing. */
+function readSpanTimes(element: Element): { start: number; end: number } {
+  const start = parseTimestamp(getAttr(element, "begin")) ?? NaN;
+  const rawEnd = parseTimestamp(getAttr(element, "end")) ?? NaN;
+  return { start, end: rawEnd < start ? NaN : rawEnd };
+}
+
+/**
+ * Gives every syllable a start and an end (NaN marks a missing one). A syllable missing
+ * its end runs until the next timed syllable starts, or the line ends, and a run with no
+ * timing at all shares that gap evenly. Left missing, the word would stay lit for good.
+ */
+function fillSyllableTimes(syllables: SyllableEntry[], lineStart: number, lineEnd: number): void {
+  const nextStart = (after: number): number => {
+    for (let k = after + 1; k < syllables.length; k++) {
+      if (!Number.isNaN(syllables[k].StartTime)) return syllables[k].StartTime;
+    }
+    return lineEnd;
+  };
+  const isUntimed = (syllable: SyllableEntry) =>
+    Number.isNaN(syllable.StartTime) && Number.isNaN(syllable.EndTime);
+
+  let previousEnd = lineStart;
+  let i = 0;
+  while (i < syllables.length) {
+    if (isUntimed(syllables[i])) {
+      let j = i;
+      while (j < syllables.length && isUntimed(syllables[j])) j++;
+      const until = Math.max(nextStart(j - 1), previousEnd);
+      const step = (until - previousEnd) / (j - i);
+      for (let k = i; k < j; k++) {
+        syllables[k].StartTime = previousEnd + step * (k - i);
+        syllables[k].EndTime = k === j - 1 ? until : previousEnd + step * (k - i + 1);
+      }
+      previousEnd = until;
+      i = j;
+      continue;
+    }
+    const syllable = syllables[i];
+    const start = Number.isNaN(syllable.StartTime) ? previousEnd : syllable.StartTime;
+    syllable.StartTime = start;
+    syllable.EndTime = Math.max(Number.isNaN(syllable.EndTime) ? nextStart(i) : syllable.EndTime, start);
+    previousEnd = syllable.EndTime;
+    i++;
+  }
+}
 
 function getAttr(element: Element | null, ...names: string[]): string | null {
   if (!element) return null;
@@ -210,27 +288,18 @@ function readITunesMetadata(root: Element) {
         const spans = Array.from(text.children)
           .filter((child) => child.localName.toLowerCase() === "span")
           .map((child) => child as Element);
-        const leadPieces = spans
-          .filter((span) => getAttr(span, "ttm:role", "role") !== "x-bg")
-          .map((span) => ({
-            Text: span.textContent?.trim() ?? "",
-            StartTime: parseTimestamp(getAttr(span, "begin")),
-            EndTime: parseTimestamp(getAttr(span, "end")),
-          }))
-          .filter((piece) => piece.Text);
+        const leadPieces = readRomanizedPieces(
+          spans.filter((span) => getAttr(span, "ttm:role", "role") !== "x-bg")
+        );
         const backgroundPieces = spans
           .filter((span) => getAttr(span, "ttm:role", "role") === "x-bg")
           .map((background) =>
-            Array.from(background.children)
-              .filter((child) => child.localName.toLowerCase() === "span")
-              .map((child) => child as Element)
-              .filter((span) => getAttr(span, "ttm:role", "role") !== "x-roman")
-              .map((span) => ({
-                Text: span.textContent?.trim() ?? "",
-                StartTime: parseTimestamp(getAttr(span, "begin")),
-                EndTime: parseTimestamp(getAttr(span, "end")),
-              }))
-              .filter((piece) => piece.Text)
+            readRomanizedPieces(
+              Array.from(background.children)
+                .filter((child) => child.localName.toLowerCase() === "span")
+                .map((child) => child as Element)
+                .filter((span) => getAttr(span, "ttm:role", "role") !== "x-roman")
+            )
           )
           .filter((pieces) => pieces.length > 0);
         // DOM text nodes preserve spaces between timed spans and plain-text
@@ -344,6 +413,7 @@ function applyRomanizedPieces(
     if (pieceIndex === -1) continue;
 
     syllable.TransliteratedText = pieces[pieceIndex].Text;
+    syllable.TransliteratedIsPartOfWord = !pieces[pieceIndex].EndsWord;
     usedPieces.add(pieceIndex);
   }
 
@@ -358,6 +428,7 @@ function applyRomanizedPieces(
 
   remainingSyllables.forEach((syllable, index) => {
     syllable.TransliteratedText = untimedPieces[index].Text;
+    syllable.TransliteratedIsPartOfWord = !untimedPieces[index].EndsWord;
   });
 }
 
@@ -427,17 +498,17 @@ function parseSyllableNodes(nodes: ChildNode[], lineStart: number, lineEnd: numb
     const role = getAttr(element, "ttm:role", "role");
     if (role === "x-translation" || role === "x-roman") return;
 
-    const startTime = parseTimestamp(getAttr(element, "begin")) ?? lineStart;
-    const endTime = parseTimestamp(getAttr(element, "end")) ?? lineEnd;
+    const { start, end } = readSpanTimes(element);
 
     syllables.push({
       Text: text.trim(),
-      StartTime: startTime,
-      EndTime: endTime,
+      StartTime: start,
+      EndTime: end,
       IsPartOfWord: isPartOfWord(nodes, index),
     });
   });
 
+  fillSyllableTimes(syllables, lineStart, lineEnd);
   return syllables;
 }
 
@@ -467,7 +538,8 @@ function parseParagraph(
   transliterationPieces: Map<string, RomanizationMetadata>
 ): ParsedLine | null {
   const paragraphStart = parseTimestamp(getAttr(paragraph, "begin")) ?? 0;
-  const paragraphEnd = parseTimestamp(getAttr(paragraph, "end")) ?? paragraphStart;
+  // A line ending before it begins ends where it begins.
+  const paragraphEnd = Math.max(parseTimestamp(getAttr(paragraph, "end")) ?? paragraphStart, paragraphStart);
   const agentId =
     getAttr(paragraph, "ttm:agent", "agent") ??
     getAttr(div, "ttm:agent", "agent") ??
@@ -518,14 +590,12 @@ function parseParagraph(
       return;
     }
 
-    const startTime = parseTimestamp(getAttr(element, "begin"));
-    const endTime = parseTimestamp(getAttr(element, "end"));
-
-    if (startTime !== null || endTime !== null) {
+    if (getAttr(element, "begin") !== null || getAttr(element, "end") !== null) {
+      const { start, end } = readSpanTimes(element);
       leadSyllables.push({
         Text: text,
-        StartTime: startTime ?? paragraphStart,
-        EndTime: endTime ?? paragraphEnd,
+        StartTime: start,
+        EndTime: end,
         IsPartOfWord: isPartOfWord(childNodes, index),
       });
       return;
@@ -533,6 +603,8 @@ function parseParagraph(
 
     plainNodes.push(node);
   });
+
+  fillSyllableTimes(leadSyllables, paragraphStart, paragraphEnd);
 
   const romanization = lineKey ? transliterationPieces.get(lineKey) : undefined;
   applyRomanizedPieces(leadSyllables, romanization?.leadPieces);
@@ -639,7 +711,9 @@ function buildSyllableLyrics(lines: ParsedLine[], songwriters: string[]) {
 }
 
 export default function parseTTMLToLyrics(ttml: string) {
-  const document = new DOMParser().parseFromString(ttml, "text/xml");
+  // &nbsp; isn't an XML entity, but HTML habits put it in hand-written TTML, and the XML
+  // parser would reject the whole document over it.
+  const document = new DOMParser().parseFromString(ttml.replace(/&nbsp;/g, "&#160;"), "text/xml");
   const parserError = document.querySelector("parsererror");
   if (parserError) {
     throw new Error(parserError.textContent?.trim() || "Invalid TTML");

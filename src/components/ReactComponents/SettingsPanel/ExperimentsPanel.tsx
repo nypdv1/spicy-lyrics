@@ -1,7 +1,8 @@
 import { useStore } from "@nanostores/react";
-import { $experiment, $experimentOverrides, $experimentsSyncing, forcedExperimentState, getAdvancedExperiments, getVisibleExperiments, RefreshExperimentOverrides, setExperiment, type ExperimentId, type ResolvedExperiment } from "../../../utils/experiments.ts";
+import { $experiment, EXPERIMENT_CATEGORIES, $experimentOverrides, $experimentsSyncing, forcedExperimentState, getAdvancedExperiments, getVisibleExperiments, RefreshExperimentOverrides, setExperiment, type ExperimentId, type ResolvedExperiment } from "../../../utils/experiments.ts";
 import { useEffect } from "react";
 import { $enableExperimentalWordSync, $externalCinemaLyricsAllowed } from "../../../utils/stores.ts";
+import { $ttmlReviewer, REVIEWER_LOCK_REASON } from "../../../utils/ttmlReviewer.ts";
 import { Row, SectionTitle, Toggle } from "./components.tsx";
 
 const experimentSettingIds: Partial<Record<ExperimentId, string>> = {
@@ -31,9 +32,19 @@ export function ExperimentSettings({ title = false, experimentIds, advancedOnly 
   return (
     <>
       {title && <SectionTitle>Experiments</SectionTitle>}
-      {experiments.filter((exp) => !experimentIds || experimentIds.includes(exp.id)).map((exp) => (
-        <ExperimentRow key={exp.id} experiment={exp} />
-      ))}
+      {experimentIds
+        ? experiments.filter((exp) => experimentIds.includes(exp.id)).map((exp) => (
+          <ExperimentRow key={exp.id} experiment={exp} />
+        ))
+        // The full list is grouped under its category headings, in EXPERIMENT_CATEGORIES order.
+        : EXPERIMENT_CATEGORIES.map(({ id, title }) => {
+          const inCategory = experiments.filter((exp) => exp.category === id);
+          if (inCategory.length === 0) return null;
+          return <div key={id} className="sl-sp-experiment-group">
+            <h4 className="sl-sp-experiment-group-title">{title}</h4>
+            {inCategory.map((exp) => <ExperimentRow key={exp.id} experiment={exp} />)}
+          </div>;
+        })}
       {showBuiltIn && <><Row
         label="Enable Cinema Lyrics Window"
         description="Show or hide the Cinema Lyrics button in the playback bar."
@@ -63,9 +74,11 @@ function ExperimentRow({ experiment }: { experiment: ResolvedExperiment }) {
   const enabled = useStore(store);
   const forced = forcedExperimentState(experiment.id);
   const syncing = useStore($experimentsSyncing);
+  // TTML Reviewer mode holds every experiment where it put it until the mode is turned off.
+  const heldByReviewer = useStore($ttmlReviewer);
 
   return (
-    <Row settingId={experimentSettingIds[experiment.id]} label={experiment.label} description={experiment.description} disabled={syncing || forced !== undefined} disabledReason={syncing ? "Refreshing experiments" : forced ? "Forced on" : "Forced off"}>
+    <Row settingId={experimentSettingIds[experiment.id]} label={experiment.label} description={experiment.description} disabled={syncing || forced !== undefined || heldByReviewer} disabledReason={syncing ? "Refreshing experiments" : forced !== undefined ? (forced ? "Forced on" : "Forced off") : REVIEWER_LOCK_REASON}>
       <Toggle checked={enabled} onChange={(v) => setExperiment(experiment.id, v)} />
     </Row>
   );

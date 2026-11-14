@@ -9,6 +9,7 @@ import "./css/DynamicBG/spicy-dynamic-bg.css";
 import "./css/Lyrics/main.css";
 import "./css/Lyrics/Mixed.css";
 import "./css/Lyrics/RefinedCredits.css";
+import "./css/Lyrics/ScrollToActive.css";
 import "./css/Loaders/LoaderContainer.css";
 import "./css/Loaders/LyricsSkeleton.css";
 import "./css/font-pack/font-pack.css";
@@ -21,6 +22,7 @@ import ApplyDynamicBackground, {
 } from "./components/DynamicBG/dynamicBackground.ts";
 import { isExperimentEnabled } from "./utils/experiments.ts";
 import "./components/DynamicBG/CanvasImmersive.ts";
+import "./components/DynamicBG/AnimatedArtwork.ts";
 import "./components/DynamicBG/NpvCanvasBackground.ts";
 import {
   $alwaysShowInFullscreen,
@@ -64,6 +66,7 @@ import Fullscreen, {
   RefreshFullscreenControlsVisibility,
   RefreshFullscreenVolumeSlider,
 } from "./components/Utils/Fullscreen.ts";
+import "./components/Utils/NextUp.ts";
 import { UpdateNowBar } from "./components/Utils/NowBar.ts";
 import { IsPlaying } from "./utils/Addons.ts";
 import { requestPositionSync } from "./utils/Gets/GetProgress.ts";
@@ -86,6 +89,9 @@ import "./css/NoticeDialog.css";
 import "./css/polyfills/sonner-polyfill.css";
 import "./css/NPVLyrics.css";
 import "./css/PopupDock.css";
+import "./css/PortraitFullscreen.css";
+import "./css/PlayerBelowCover.css";
+import "./css/GroupedViewControls.css";
 import { showUpdatedDialog } from "./components/ReactComponents/UpdateDialog.tsx";
 import { IsPIP, OpenPopupLyrics, ClosePopupLyrics } from "./components/Utils/PopupLyrics.ts";
 import {
@@ -273,8 +279,21 @@ async function main() {
 
   const fromVersion = $fromVersion.get();
   const spicyLyricsVersion = $spicyLyricsVersion.get();
-  const updatedFromPreviousVersion = Boolean(fromVersion && spicyLyricsVersion && fromVersion !== spicyLyricsVersion);
-  if (updatedFromPreviousVersion) showUpdatedDialog(fromVersion, spicyLyricsVersion);
+  // Each version is announced once: when two installs of different versions take turns
+  // loading (a channel switch, or two Spotify profiles), the version flips on every launch.
+  // The announced version has a key of its own because an older copy rewrites the whole
+  // UI-state blob from the snapshot it loaded, which would drop it.
+  const LAST_ANNOUNCED_KEY = "SL:lastAnnouncedVersion";
+  const updatedFromPreviousVersion = Boolean(
+    fromVersion &&
+      spicyLyricsVersion &&
+      fromVersion !== spicyLyricsVersion &&
+      Spicetify.LocalStorage.get(LAST_ANNOUNCED_KEY) !== spicyLyricsVersion
+  );
+  if (updatedFromPreviousVersion) {
+    Spicetify.LocalStorage.set(LAST_ANNOUNCED_KEY, spicyLyricsVersion);
+    showUpdatedDialog(fromVersion, spicyLyricsVersion);
+  }
 
   $fromVersion.set(spicyLyricsVersion);
   void initSession();
@@ -1070,8 +1089,11 @@ async function main() {
     });
 
     let songChangeSeen = false;
+    // The cover the last background apply was asked for (see the cover poll below).
+    let lastBackgroundCover = "";
     async function onSongChange(event: any) {
       songChangeSeen = true;
+      lastBackgroundCover = SpotifyPlayer.GetCover("large") ?? "";
       playbackLogger.debug("Song change pipeline");
       const contentType = SpotifyPlayer.GetContentType();
       playbackLogger.debug("Detected content type", contentType);
@@ -1120,6 +1142,24 @@ async function main() {
       }
     }
     Global.Event.listen("playback:songchange", onSongChange);
+
+    // At a song change the player can still report a cover that isn't the new track's,
+    // and nothing fires when the right one arrives, so the background stayed on the
+    // wrong art. Repaint whenever the reported cover differs from the one last applied;
+    // an apply for the cover already shown returns at once.
+    {
+      lastBackgroundCover = SpotifyPlayer.GetCover("large") ?? "";
+      new IntervalManager(0.5, () => {
+        const cover = SpotifyPlayer.GetCover("large") ?? "";
+        if (cover === lastBackgroundCover) return;
+        lastBackgroundCover = cover;
+        void scheduleNowPlayingBarDynamicBackgroundApply();
+        const contentBox = PageContainer?.querySelector<HTMLElement>(".ContentBox");
+        if (!contentBox) return;
+        if (getBackgroundStyle() === "color" && !isExperimentEnabled("refinedBackground")) return;
+        void ApplyDynamicBackground(contentBox, PAGE_BACKGROUND_KEY);
+      }).Start();
+    }
 
     // Spotify can restore the track before the songchange relay is attached and never send one for
     // it, which leaves a page opened at boot on the placeholder cover with no lyrics.
@@ -1316,7 +1356,7 @@ async function main() {
               }
             );
           } catch (err) {
-            console.error("Spicy Lyrics: couldn't listen for volume changes", err);
+            playbackLogger.error("Couldn't listen for volume changes", err);
           }
         }
       );

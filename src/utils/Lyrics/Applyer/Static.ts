@@ -21,10 +21,14 @@ import { StripZeroWidth } from "./Utils/StripZeroWidth.ts";
 import { ApplyIsByCommunity } from "./Credits/ApplyIsByCommunity.tsx";
 import { ApplyLyricsCredits, MarkLastLineSide } from "./Credits/ApplyLyricsCredits.ts";
 import { ApplyExperimentalWordSyncNotice } from "./Credits/ApplyExperimentalWordSyncNotice.ts";
+import { AppendLineRomanization, RomanizeUnderLine } from "./Utils/RomanizedRow.ts";
 import { EmitApply, EmitNotApplyed } from "./OnApply.ts";
 import { ApplyLyricsProvider } from "./Credits/ApplyProvider.ts";
 import { CreateLyricsFooter } from "./Credits/CreateLyricsFooter.ts";
 import Defaults from "../../../components/Global/Defaults.ts";
+import Logger from "../../Logger.ts";
+
+const staticLogger = new Logger("Static Lyrics");
 
 /**
  * Interface for static lyrics data
@@ -78,6 +82,9 @@ export function ApplyStaticLyrics(
   viewportAnchor: LyricsViewportAnchor | null = null
 ): void {
   if (!$lyricsContainerExists.get()) return;
+  // Under each line, the line keeps its own text and the romanization gets a row below it.
+  const UnderLine = RomanizeUnderLine();
+  const ShowRomanized = UseRomanized && !UnderLine;
 
   EmitNotApplyed();
 
@@ -91,7 +98,7 @@ export function ApplyStaticLyrics(
   const LyricsContainer = LyricsContainerInstance.Container;
 
   if (!LyricsContainer) {
-    console.error("Cannot apply static lyrics: LyricsContainer not found");
+    staticLogger.error("Cannot apply static lyrics: LyricsContainer not found");
     return;
   }
 
@@ -115,7 +122,7 @@ export function ApplyStaticLyrics(
   data.Lines.forEach((line) => {
     const lineElem = document.createElement("div");
 
-    lineElem.textContent = StripZeroWidth(getDisplayText(line, UseRomanized));
+    lineElem.textContent = StripZeroWidth(getDisplayText(line, ShowRomanized));
     lineElem.dataset.lyricsOriginalText = getDisplayText(line, false);
     lineElem.dataset.lyricsRomanizedText = getDisplayText(line, true);
 
@@ -125,6 +132,7 @@ export function ApplyStaticLyrics(
 
     lineElem.classList.add("line");
     lineElem.classList.add("static");
+    if (UnderLine) AppendLineRomanization(lineElem, line);
 
     // Add the line element to the lyrics object
     const staticLine: LyricsStatic = {

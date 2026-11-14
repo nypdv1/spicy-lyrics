@@ -1,4 +1,4 @@
-import { $lyricsContainerExists, $simpleLyricsMode } from "../../../../utils/stores.ts";
+import { $lyricsContainerExists, $simpleLyricsMode, isBloomRenderer } from "../../../../utils/stores.ts";
 import { PageContainer } from "../../../../components/Pages/PageView.ts";
 import { applyStyles, removeAllStyles } from "../../../CSS/Styles.ts";
 import {
@@ -25,11 +25,15 @@ import { initLyricsVirtualizer, type LyricsViewportAnchor } from "../../LyricsVi
 import { ApplyIsByCommunity } from "../Credits/ApplyIsByCommunity.tsx";
 import { ApplyLyricsCredits, MarkLastLineSide } from "../Credits/ApplyLyricsCredits.ts";
 import { ApplyExperimentalWordSyncNotice } from "../Credits/ApplyExperimentalWordSyncNotice.ts";
+import { AppendLineRomanization, RomanizeUnderLine } from "../Utils/RomanizedRow.ts";
 import { EmitApply, EmitNotApplyed } from "../OnApply.ts";
 import { ApplyLyricsProvider } from "../Credits/ApplyProvider.ts";
 import { CreateLyricsFooter } from "../Credits/CreateLyricsFooter.ts";
 import Defaults from "../../../../components/Global/Defaults.ts";
 import { StripZeroWidth } from "../Utils/StripZeroWidth.ts";
+import Logger from "../../../Logger.ts";
+
+const lineLogger = new Logger("Line Lyrics");
 
 // Define the data structure for lyrics
 interface LyricsLineData {
@@ -80,6 +84,9 @@ export function ApplyLineLyrics(
   viewportAnchor: LyricsViewportAnchor | null = null
 ): void {
   if (!$lyricsContainerExists.get()) return;
+  // Under each line, the line keeps its own text and the romanization gets a row below it.
+  const UnderLine = RomanizeUnderLine();
+  const ShowRomanized = UseRomanized && !UnderLine;
   EmitNotApplyed();
 
   DestroyAllLyricsContainers();
@@ -93,7 +100,7 @@ export function ApplyLineLyrics(
 
   // Check if LyricsContainer exists
   if (!LyricsContainer) {
-    console.error("LyricsContainer not found");
+    lineLogger.error("LyricsContainer not found");
     return;
   }
 
@@ -212,10 +219,11 @@ export function ApplyLineLyrics(
 
   data.Content.forEach((line, index, arr) => {
     const lineElem = document.createElement("div");
-    lineElem.textContent = StripZeroWidth(getDisplayText(line, UseRomanized));
+    lineElem.textContent = StripZeroWidth(getDisplayText(line, ShowRomanized));
     lineElem.dataset.lyricsOriginalText = getDisplayText(line, false);
     lineElem.dataset.lyricsRomanizedText = getDisplayText(line, true);
     lineElem.classList.add("line");
+    if (UnderLine) AppendLineRomanization(lineElem, line);
 
     if (isRtl(line.Text) && !lineElem.classList.contains("rtl")) {
       lineElem.classList.add("rtl");
@@ -226,7 +234,7 @@ export function ApplyLineLyrics(
     const lineEndTimeAndNextLineStartTimeDistance =
       nextLineStartTime !== 0 ? nextLineStartTime - line.EndTime : 0;
 
-    const lineEndTime = $simpleLyricsMode.get()
+    const lineEndTime = $simpleLyricsMode.get() || isBloomRenderer()
       ? nextLineStartTime === 0
         ? line.EndTime
         : lineEndTimeAndNextLineStartTimeDistance < getLyricsBetweenShow() &&
@@ -240,6 +248,7 @@ export function ApplyLineLyrics(
       StartTime: ConvertTime(line.StartTime),
       EndTime: ConvertTime(lineEndTime),
       TotalTime: ConvertTime(lineEndTime) - ConvertTime(line.StartTime),
+      LeadEndTime: ConvertTime(line.EndTime),
     });
 
     if (line.OppositeAligned) {

@@ -5,6 +5,9 @@ import { PopupModal } from "../components/Modal.ts";
 import SettingsPanel from "../components/ReactComponents/SettingsPanel/index.tsx";
 import HiddenSettingsPanel from "../components/ReactComponents/SettingsPanel/HiddenSettingsPanel.tsx";
 import AnimatorBehaviorPanel from "../components/ReactComponents/SettingsPanel/AnimatorBehaviorPanel.tsx";
+import { ReviewerPane } from "../components/ReactComponents/SettingsPanel/ReviewerSection.tsx";
+import { BugReportPane } from "../components/ReactComponents/SettingsPanel/BugReportSection.tsx";
+import type { SettingsSubPane } from "../components/ReactComponents/SettingsPanel/DeveloperSection.tsx";
 import Fullscreen from "../components/Utils/Fullscreen.ts";
 import type { SettingsPanelState } from "../components/ReactComponents/SettingsPanel/index.tsx";
 import { $settingsMenuLocation } from "./uiState.ts";
@@ -64,6 +67,7 @@ export function openSettingsPanel(targetDocument: Document = document) {
   };
   const createSettingsPanel = () => React.createElement(SettingsPanel, {
     onOpenHiddenSettings: openHiddenSettingsPanel,
+    onOpenPane: openSubPane,
     onManageAnimator: openAnimatorBehaviorPanel,
     initialState: currentState,
     onStateChange: updateState,
@@ -105,6 +109,21 @@ export function openSettingsPanel(targetDocument: Document = document) {
     currentRoute = "hidden";
     const { container, root } = renderPanel(targetDocument, React.createElement(HiddenSettingsPanel, { onBack: backToSettings }), "forward");
     PopupModal.transition({ title: "Hidden Settings", content: container, modalId: MODAL_ID, onClose: () => closePanel(root) });
+  };
+  // The TTML Reviewer and Bug Report panes. They aren't remembered as a menu location:
+  // reopening Settings lands on the tab they were opened from.
+  const openSubPane = (pane: SettingsSubPane) => {
+    captureScrollPosition();
+    const element = pane === "reviewer"
+      ? React.createElement(ReviewerPane, { onBack: backToSettings })
+      : React.createElement(BugReportPane, { onBack: backToSettings });
+    const { container, root } = renderPanel(targetDocument, element, "forward");
+    PopupModal.transition({
+      title: pane === "reviewer" ? "TTML Reviewer" : "Bug Report",
+      content: container,
+      modalId: MODAL_ID,
+      onClose: () => closePanel(root),
+    });
   };
   const backToSettings = () => {
     const state = (openAnimatorBehaviorPanel as any).state as SettingsPanelState | undefined;

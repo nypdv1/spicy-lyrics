@@ -1,4 +1,12 @@
-import { $lyricsContainerExists, $minimalLyricsMode, $simpleLyricsMode, $spaceGravityMode } from "../../../../utils/stores.ts";
+import {
+  $lyricsContainerExists,
+  $minimalLyricsMode,
+  $simpleLyricsMode,
+  $spaceGravityMode,
+  $syllableMerge,
+  $syllablePace,
+  isBloomRenderer,
+} from "../../../../utils/stores.ts";
 import { PageContainer } from "../../../../components/Pages/PageView.ts";
 import { applyStyles, removeAllStyles } from "../../../CSS/Styles.ts";
 import {
@@ -37,10 +45,17 @@ import { ApplyIsByCommunity } from "../Credits/ApplyIsByCommunity.tsx";
 import { ApplyLyricsCredits, MarkLastLineSide } from "../Credits/ApplyLyricsCredits.ts";
 import { ApplyExperimentalWordSyncNotice } from "../Credits/ApplyExperimentalWordSyncNotice.ts";
 import { EmitApply, EmitNotApplyed } from "../OnApply.ts";
-import Emphasize from "../Utils/Emphasize.ts";
+import Emphasize, { createFlameGroup, type FlameGroup, type SyllablePart } from "../Utils/Emphasize.ts";
 import { StripZeroWidth } from "../Utils/StripZeroWidth.ts";
 import { IsLetterCapable, MinLetterCapableDuration } from "../Utils/IsLetterCapable.ts";
 import { SplitLetters } from "../Utils/SplitLetters.ts";
+import { JoinSplitWords } from "../Utils/JoinSplitWords.ts";
+import { PickPartOfWord } from "../Utils/PickDisplayText.ts";
+import { AppendSyllableRomanization, RomanizeUnderLine } from "../Utils/RomanizedRow.ts";
+import { HasRenderableText } from "../../EmptyLines.ts";
+import Logger from "../../../Logger.ts";
+
+const syllableLogger = new Logger("Syllable Lyrics");
 import { ApplyLyricsProvider } from "../Credits/ApplyProvider.ts";
 import { CreateLyricsFooter, PlaceLyricsFooter } from "../Credits/CreateLyricsFooter.ts";
 import Defaults from "../../../../components/Global/Defaults.ts";
@@ -54,6 +69,9 @@ interface SyllableData {
   StartTime: number;
   EndTime: number;
   IsPartOfWord?: boolean;
+  TransliteratedIsPartOfWord?: boolean;
+  // A word joined from syllables keeps them here.
+  Parts?: SyllableData[];
 }
 
 interface LeadData {
@@ -89,86 +107,116 @@ interface LyricsData {
   styles?: Record<string, string>;
 }
 
-const hasDigit = (text: string) => /\d/.test(text);
-
-function reduceSyllables(syllables: SyllableData[], mode: string): SyllableData[] {
-  if (mode === "Default" || !mode) return syllables;
-
-  if (mode === "Merge Words") {
-    const result: SyllableData[] = [];
-    let i = 0;
-    while (i < syllables.length) {
-      const current = { ...syllables[i] };
-      while (i < syllables.length - 1 && syllables[i].IsPartOfWord) {
-        const next = syllables[i + 1];
-        if (current.Text.endsWith("-") || next.Text.startsWith("-")) break;
-        if (hasDigit(current.Text) || hasDigit(next.Text)) break;
-        current.Text += next.Text;
-        if (current.TransliteratedText !== undefined || next.TransliteratedText !== undefined) {
-          const currentText = current.TransliteratedText ?? current.Text.slice(0, -next.Text.length);
-          const nextText = next.TransliteratedText ?? next.Text;
-          current.TransliteratedText = currentText + nextText;
-        }
-        if (current.GibberishText !== undefined || next.GibberishText !== undefined) {
-          current.GibberishText = `${current.GibberishText ?? ""}${next.GibberishText ?? ""}`;
-        }
-        current.EndTime = next.EndTime;
-        i++;
-      }
-      if (!syllables[i].IsPartOfWord) current.IsPartOfWord = false;
-      result.push(current);
-      i++;
-    }
-    return result;
-  }
-
-  if (mode === "Reduce Splits") {
-    const result: SyllableData[] = [];
-    let i = 0;
-    while (i < syllables.length) {
-      const current = { ...syllables[i] };
-      const duration = current.EndTime - current.StartTime;
-      if (
-        duration < 0.2 &&
-        i < syllables.length - 1 &&
-        current.IsPartOfWord &&
-        !current.Text.endsWith("-") &&
-        !hasDigit(current.Text) &&
-        !hasDigit(syllables[i + 1].Text)
-      ) {
-        const next = syllables[i + 1];
-        current.Text += next.Text;
-        if (current.TransliteratedText !== undefined || next.TransliteratedText !== undefined) {
-          const currentText = current.TransliteratedText ?? current.Text.slice(0, -next.Text.length);
-          const nextText = next.TransliteratedText ?? next.Text;
-          current.TransliteratedText = currentText + nextText;
-        }
-        if (current.GibberishText !== undefined || next.GibberishText !== undefined) {
-          current.GibberishText = `${current.GibberishText ?? ""}${next.GibberishText ?? ""}`;
-        }
-        current.EndTime = next.EndTime;
-        current.IsPartOfWord = next.IsPartOfWord;
-        i += 2;
-      } else {
-        i++;
-      }
-      result.push(current);
-    }
-    const hasShort = result.some(
-      (s, idx) =>
-        s.EndTime - s.StartTime < 0.2 &&
-        s.IsPartOfWord &&
-        !s.Text.endsWith("-") &&
-        !hasDigit(s.Text) &&
-        idx < result.length - 1 &&
-        !hasDigit(result[idx + 1].Text)
-    );
-    if (hasShort && result.length < syllables.length) return reduceSyllables(result, mode);
-    return result;
-  }
-
-  return syllables;
+// Joined before the empty parts are dropped, so a separator between two words
+// still ends the run and they aren't joined across it. The romanization can end
+// words the source text runs together (romaji under Japanese), so the romanized
+// view takes its word breaks from there.
+function renderableSyllables(
+  syllables: SyllableData[],
+  useRomanized: boolean,
+  allowLetters: boolean
+): SyllableData[] {
+  const words = useRomanized
+    ? syllables.map((s) =>
+        s.TransliteratedIsPartOfWord === undefined ? s : { ...s, IsPartOfWord: s.TransliteratedIsPartOfWord }
+      )
+    : syllables;
+  const merge = $syllableMerge.get();
+  const parts =
+    merge === "off"
+      ? words
+      : JoinSplitWords(words, merge, (word) => allowLetters && splitLetters(word, useRomanized) !== null);
+  return parts.filter(HasRenderableText);
 }
+
+// A syllable's letters when it's held long enough to be drawn letter by letter, else null.
+function splitLetters(syllable: SyllableData, useRomanized: boolean): string[] | null {
+  const duration = ConvertTime(syllable.EndTime) - ConvertTime(syllable.StartTime);
+  // Too short to split whatever its letters: skip the grapheme split.
+  if (duration < MinLetterCapableDuration()) return null;
+  const text = StripZeroWidth(getSyllableText(syllable, useRomanized));
+  const letters = SplitLetters(text);
+  return letters.length > 0 && IsLetterCapable(letters.length, duration) && !isRtl(text) ? letters : null;
+}
+
+// With Keep Syllable Pace, where each syllable of a joined word starts and how
+// many of its letters it has, so Emphasize can time them by syllable. Undefined
+// for a word that wasn't joined, or whose syllables split into other letters.
+function pacedParts(
+  syllable: SyllableData,
+  useRomanized: boolean,
+  letterCount: number
+): SyllablePart[] | undefined {
+  if (!syllable.Parts || !$syllablePace.get()) return undefined;
+  const parts = syllable.Parts.map((part) => ({
+    StartTime: part.StartTime,
+    Letters: SplitLetters(StripZeroWidth(getSyllableText(part, useRomanized))).length,
+  }));
+  return parts.reduce((sum, part) => sum + part.Letters, 0) === letterCount ? parts : undefined;
+}
+
+// Bloom judges a word sung in syllables as a whole: whether it's split into
+// letters, and how far the fill edge runs past it, go by the whole word's
+// letters and length. Spring keeps judging each syllable alone.
+type WordPlan = { Letters: string[]; Split: boolean; WordLetters: number; Group: FlameGroup | null };
+
+function planWords(
+  parts: SyllableData[],
+  useRomanized: boolean,
+  isBackground: boolean,
+  allowLetters: boolean
+): WordPlan[] {
+  const texts = parts.map((part) => StripZeroWidth(getSyllableText(part, useRomanized)));
+  const durations = parts.map((part) => ConvertTime(part.EndTime) - ConvertTime(part.StartTime));
+  const lettersOf = (i: number, duration: number) =>
+    allowLetters && duration >= MinLetterCapableDuration() ? SplitLetters(texts[i]) : [];
+  const plans: WordPlan[] = [];
+  for (let i = 0; i < parts.length; i++) {
+    let end = i;
+    if (isBloomRenderer()) {
+      while (PickPartOfWord(parts[end], useRomanized) && end + 1 < parts.length) end++;
+    }
+    if (end === i) {
+      const letters = lettersOf(i, durations[i]);
+      plans.push({
+        Letters: letters,
+        Split:
+          letters.length > 0 && IsLetterCapable(letters.length, durations[i], isBackground) && !isRtl(texts[i]),
+        WordLetters: letters.length || SplitLetters(texts[i]).length,
+        Group: null,
+      });
+      continue;
+    }
+    const duration = ConvertTime(parts[end].EndTime) - ConvertTime(parts[i].StartTime);
+    const letters = parts.slice(i, end + 1).map((_, k) => lettersOf(i + k, duration));
+    const total = letters.reduce((sum, l) => sum + l.length, 0);
+    const split =
+      total > 0 &&
+      IsLetterCapable(total, duration, isBackground) &&
+      !texts.slice(i, end + 1).some((text) => isRtl(text));
+    const group = split ? createFlameGroup(parts[i].StartTime, parts[end].EndTime) : null;
+    for (let k = 0; k <= end - i; k++) {
+      plans.push({
+        Letters: letters[k],
+        Split: split && letters[k].length > 0,
+        WordLetters: total || texts.slice(i, end + 1).join("").length,
+        Group: group,
+      });
+    }
+    i = end;
+  }
+  return plans;
+}
+
+// The whole word's letter count, for the fill edge (see getLineSweep).
+const tagWordLetters = (count: number) => {
+  const lead = LyricsObject.Types.Syllable.Lines[CurrentLineLyricsObject]?.Syllables?.Lead;
+  const entry = lead?.[lead.length - 1] as { WordLetters?: number } | undefined;
+  if (entry) entry.WordLetters = count;
+};
+
+// Spring with the full word animation: not Simple Lyrics Mode, not Bloom.
+const usesSpringWordStyles = (): boolean => !$simpleLyricsMode.get() && !isBloomRenderer();
 
 function getSyllableText(syllable: SyllableData, useRomanized: boolean): string {
   if (Defaults.MemeFormat !== "Off" && syllable.GibberishText !== undefined) {
@@ -216,7 +264,7 @@ function replaceLetterGroupText(word: any, text: string): void {
     element.textContent = letter;
     element.classList.add("letter", "Emphasis");
     if (index === letters.length - 1) element.classList.add("LastLetterInWord");
-    if (!$simpleLyricsMode.get()) element.style.setProperty("--gradient-position", "-20%");
+    if (usesSpringWordStyles()) element.style.setProperty("--gradient-position", "-20%");
     element.style.setProperty("--text-shadow-opacity", "0%");
     element.style.setProperty("--text-shadow-blur-radius", "4px");
     element.style.scale = getIdleEmphasisLyricsScale().toString();
@@ -262,8 +310,12 @@ export function UpdateSyllableLyricsRomanization(useRomanized: boolean): void {
   }
 }
 
-function shouldJoinSyllableToNext(syllable: SyllableData, isLastInLine: boolean): boolean {
-  if (syllable.IsPartOfWord) return true;
+function shouldJoinSyllableToNext(
+  syllable: SyllableData,
+  isLastInLine: boolean,
+  useRomanized: boolean
+): boolean {
+  if (PickPartOfWord(syllable, useRomanized)) return true;
   return (
     Defaults.MemeFormat === "Gibberish" &&
     syllable.GibberishText !== undefined &&
@@ -347,6 +399,9 @@ export function ApplySyllableLyrics(
   viewportAnchor: LyricsViewportAnchor | null = null
 ): void {
   if (!$lyricsContainerExists.get()) return;
+  // Under each line, the line keeps its own text and the romanization gets a row below it.
+  const UnderLine = RomanizeUnderLine();
+  const ShowRomanized = UseRomanized && !UnderLine;
   EmitNotApplyed();
 
   DestroyAllLyricsContainers();
@@ -360,7 +415,7 @@ export function ApplySyllableLyrics(
 
   // Check if LyricsContainer exists
   if (!LyricsContainer) {
-    console.error("LyricsContainer not found");
+    syllableLogger.error("LyricsContainer not found");
     return;
   }
 
@@ -394,7 +449,6 @@ export function ApplySyllableLyrics(
   // First render through SimpleBar so the lyrics host has stable dimensions.
   // Gravity's mounted-session switch owns the subsequent DOM transition.
   const spaceGravityMode = false;
-  const syllableMode = "Default";
   const allowLetterEmphasis = !data.experimentalWordSync;
 
   if (data.StartTime >= getLyricsBetweenShow()) {
@@ -491,14 +545,17 @@ export function ApplySyllableLyrics(
     const lineElem = document.createElement("div");
     lineElem.classList.add("line");
 
-    const processedLeadSyllables = reduceSyllables(line.Lead.Syllables, syllableMode);
+    const processedLeadSyllables = renderableSyllables(line.Lead.Syllables, ShowRomanized, allowLetterEmphasis);
+    const leadPlans = planWords(processedLeadSyllables, ShowRomanized, false, allowLetterEmphasis);
     const nextLineStartTime = arr[index + 1]?.Lead.StartTime ?? 0;
 
     const lineEndTimeAndNextLineStartTimeDistance =
       nextLineStartTime !== 0 ? nextLineStartTime - line.Lead.EndTime : 0;
 
+    // Fade Away Previous Lines and Bloom keep a line active until the next one
+    // starts, unless the gap is long enough for an interlude.
     const lineEndTime =
-      $minimalLyricsMode.get()
+      $minimalLyricsMode.get() || isBloomRenderer()
         ? nextLineStartTime === 0
           ? line.Lead.EndTime
           : lineEndTimeAndNextLineStartTimeDistance < getLyricsBetweenShow() &&
@@ -512,6 +569,7 @@ export function ApplySyllableLyrics(
       StartTime: ConvertTime(line.Lead.StartTime),
       EndTime: ConvertTime(lineEndTime),
       TotalTime: ConvertTime(lineEndTime) - ConvertTime(line.Lead.StartTime),
+      LeadEndTime: ConvertTime(line.Lead.EndTime),
     });
 
     SetWordArrayInCurentLine();
@@ -527,7 +585,7 @@ export function ApplySyllableLyrics(
     processedLeadSyllables.forEach((lead, iL, aL) => {
       let word = document.createElement("span");
       const isLastInLine = iL === aL.length - 1;
-      const shouldJoinToNext = shouldJoinSyllableToNext(lead, isLastInLine);
+      const shouldJoinToNext = shouldJoinSyllableToNext(lead, isLastInLine, ShowRomanized);
 
       if (isRtl(lead.Text) && !lineElem.classList.contains("rtl")) {
         lineElem.classList.add("rtl");
@@ -535,17 +593,14 @@ export function ApplySyllableLyrics(
 
       const totalDuration = ConvertTime(lead.EndTime) - ConvertTime(lead.StartTime);
 
-      const leadText = StripZeroWidth(getSyllableText(lead, UseRomanized));
-      // Too short to split whatever its letters: skip the grapheme split.
-      const letters = allowLetterEmphasis && totalDuration >= MinLetterCapableDuration() ? SplitLetters(leadText) : [];
-      const letterLength = letters.length;
+      const leadText = StripZeroWidth(getSyllableText(lead, ShowRomanized));
+      const plan = leadPlans[iL];
+      const letters = plan.Letters;
 
-      const IfLetterCapable =
-        letterLength > 0 && IsLetterCapable(letterLength, totalDuration) && !isRtl(leadText);
-
-      if (IfLetterCapable) {
+      if (plan.Split) {
         word = document.createElement("div");
-        Emphasize(letters, word, lead);
+        Emphasize(letters, word, lead, false, pacedParts(lead, ShowRomanized, letters.length), plan.Group);
+        tagWordLetters(plan.WordLetters);
 
         if (isLastInLine) {
           word.classList.add("LastWordInLine");
@@ -553,7 +608,7 @@ export function ApplySyllableLyrics(
           word.classList.add("PartOfWord");
         }
 
-        if (!$simpleLyricsMode.get()) {
+        if (usesSpringWordStyles()) {
           word.style.setProperty("--text-shadow-opacity", `0%`);
           word.style.setProperty("--text-shadow-blur-radius", `4px`);
           word.style.scale = getIdleEmphasisLyricsScale().toString();
@@ -562,7 +617,7 @@ export function ApplySyllableLyrics(
       } else {
         word.textContent = leadText;
 
-        if (!$simpleLyricsMode.get()) {
+        if (usesSpringWordStyles()) {
           word.style.setProperty("--gradient-position", `-20%`);
           word.style.setProperty("--text-shadow-opacity", `0%`);
           word.style.setProperty("--text-shadow-blur-radius", `4px`);
@@ -585,6 +640,7 @@ export function ApplySyllableLyrics(
             EndTime: ConvertTime(lead.EndTime),
             TotalTime: totalDuration,
           });
+          tagWordLetters(plan.WordLetters);
         } else {
           console.warn("Syllables.Lead is undefined for CurrentLineLyricsObject");
         }
@@ -593,7 +649,7 @@ export function ApplySyllableLyrics(
       setSyllableTextVariants(word, lead, leadText);
 
       const prev = aL[iL - 1];
-      const prevShouldJoinToNext = prev ? shouldJoinSyllableToNext(prev, false) : false;
+      const prevShouldJoinToNext = prev ? shouldJoinSyllableToNext(prev, false, ShowRomanized) : false;
 
       if (shouldJoinToNext || (prevShouldJoinToNext && currentWordGroup)) {
         if (!currentWordGroup) {
@@ -613,6 +669,11 @@ export function ApplySyllableLyrics(
         lineElem.appendChild(word);
       }
     });
+
+    if (UnderLine) {
+      const hasBackground = line.Background?.some((bg) => bg.Syllables.some(HasRenderableText)) ?? false;
+      AppendSyllableRomanization(lineElem, line.Lead.Syllables, hasBackground);
+    }
 
     const parentLineIndex = LyricsObject.Types.Syllable.Lines.length - 1;
     if (line.Background) {
@@ -639,11 +700,12 @@ export function ApplySyllableLyrics(
 
         let currentBGWordGroup: HTMLSpanElement | null = null;
 
-        const processedBGSyllables = reduceSyllables(bg.Syllables, syllableMode);
+        const processedBGSyllables = renderableSyllables(bg.Syllables, ShowRomanized, allowLetterEmphasis);
+        const bgPlans = planWords(processedBGSyllables, ShowRomanized, true, allowLetterEmphasis);
         processedBGSyllables.forEach((bw, bI, bA) => {
           let bwE = document.createElement("span");
           const isLastInLine = bI === bA.length - 1;
-          const shouldJoinToNext = shouldJoinSyllableToNext(bw, isLastInLine);
+          const shouldJoinToNext = shouldJoinSyllableToNext(bw, isLastInLine, ShowRomanized);
 
           if (isRtl(bw.Text) && !lineE.classList.contains("rtl")) {
             lineE.classList.add("rtl");
@@ -651,17 +713,13 @@ export function ApplySyllableLyrics(
 
           const totalDuration = ConvertTime(bw.EndTime) - ConvertTime(bw.StartTime);
 
-            const bwText = StripZeroWidth(getSyllableText(bw, UseRomanized));
-          // Too short to split whatever its letters: skip the grapheme split.
-          const letters = allowLetterEmphasis && totalDuration >= MinLetterCapableDuration() ? SplitLetters(bwText) : [];
-          const letterLength = letters.length;
+          const bwText = StripZeroWidth(getSyllableText(bw, ShowRomanized));
+          const plan = bgPlans[bI];
 
-          const IfLetterCapable =
-            letterLength > 0 && IsLetterCapable(letterLength, totalDuration) && !isRtl(bwText);
-
-          if (IfLetterCapable) {
+          if (plan.Split) {
             bwE = document.createElement("div");
-            Emphasize(letters, bwE, bw, true);
+            Emphasize(plan.Letters, bwE, bw, true, pacedParts(bw, ShowRomanized, plan.Letters.length), plan.Group);
+            tagWordLetters(plan.WordLetters);
 
             if (isLastInLine) {
               bwE.classList.add("LastWordInLine");
@@ -669,7 +727,7 @@ export function ApplySyllableLyrics(
               bwE.classList.add("PartOfWord");
             }
 
-            if (!$simpleLyricsMode.get()) {
+            if (usesSpringWordStyles()) {
               bwE.style.setProperty("--text-shadow-opacity", `0%`);
               bwE.style.setProperty("--text-shadow-blur-radius", `4px`);
               bwE.style.scale = getIdleEmphasisLyricsScale().toString();
@@ -678,7 +736,7 @@ export function ApplySyllableLyrics(
           } else {
             bwE.textContent = bwText;
 
-            if (!$simpleLyricsMode.get()) {
+            if (usesSpringWordStyles()) {
               bwE.style.setProperty("--gradient-position", `0%`);
               bwE.style.setProperty("--text-shadow-opacity", `0%`);
               bwE.style.setProperty("--text-shadow-blur-radius", `4px`);
@@ -695,6 +753,7 @@ export function ApplySyllableLyrics(
                 TotalTime: ConvertTime(bw.EndTime) - ConvertTime(bw.StartTime),
                 BGWord: true,
               });
+              tagWordLetters(plan.WordLetters);
             } else {
               console.warn("Syllables.Lead is undefined for CurrentLineLyricsObject");
             }
@@ -712,7 +771,7 @@ export function ApplySyllableLyrics(
           setSyllableTextVariants(bwE, bw, bwText);
 
           const prevBG = bA[bI - 1];
-          const prevShouldJoinToNext = prevBG ? shouldJoinSyllableToNext(prevBG, false) : false;
+          const prevShouldJoinToNext = prevBG ? shouldJoinSyllableToNext(prevBG, false, ShowRomanized) : false;
 
           if (shouldJoinToNext || (prevShouldJoinToNext && currentBGWordGroup)) {
             if (!currentBGWordGroup) {
@@ -732,6 +791,8 @@ export function ApplySyllableLyrics(
             lineE.appendChild(bwE);
           }
         });
+
+        if (UnderLine) AppendSyllableRomanization(lineE, bg.Syllables);
       });
     }
     const nextLine = arr[index + 1];

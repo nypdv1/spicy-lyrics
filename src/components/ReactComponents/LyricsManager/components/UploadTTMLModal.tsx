@@ -9,6 +9,9 @@ import { $currentLyricsData } from "../../../../utils/stores";
 import { $lastFetchedUri } from "../../../../utils/uiState";
 import { LocalLyricsManager } from "../../../../utils/Lyrics/manager";
 import { DatabaseIcon, GuideIcon, ResetIcon, UploadIcon } from "./Icons";
+import Logger from "../../../../utils/Logger.ts";
+
+const uploadLogger = new Logger("TTML Upload");
 
 type UploadMode = "persistent" | "session" | "temporary";
 
@@ -59,7 +62,7 @@ export default function UploadTTMLModal({ onOpenDB, onDone }: UploadTTMLModalPro
         .then((lyrics) => ApplyLyricsIfCurrent(uri, lyrics))
         .catch((err) => {
           toast.error("Error applying lyrics", { duration: 4000 });
-          console.error("Error applying lyrics:", err);
+          uploadLogger.error("Error applying lyrics", err);
         });
     }, 25);
   }
@@ -122,6 +125,9 @@ export default function UploadTTMLModal({ onOpenDB, onDone }: UploadTTMLModalPro
             ...result?.Result,
             id: lyricsId,
             userUploaded: true,
+            // The source rides along so a spelling change can romanize it again (fetchLyrics).
+            temporaryUpload: true,
+            uploadedTTML: ttml,
           };
           await ProcessLyrics(dataToSave);
           if (mode === "session" && songKey) {
@@ -141,7 +147,7 @@ export default function UploadTTMLModal({ onOpenDB, onDone }: UploadTTMLModalPro
         }
       } catch (err) {
         toast.error("Upload failed.", { duration: 5000 });
-        console.error("TTML upload error:", err);
+        uploadLogger.error("TTML upload error", err);
         setUploading(false);
       }
     };

@@ -7,7 +7,7 @@ import Global from "../Global/Global.ts";
 import Defaults from "../Global/Defaults.ts";
 import { SetKawarpSuspended } from "../DynamicBG/dynamicBackground.ts";
 import PageView, { Compactify, GetPageRoot, PageContainer, Tooltips } from "../Pages/PageView.ts";
-import { EnableCompactMode, IsCompactMode } from "./CompactMode.ts";
+import { DisableCompactMode, EnableCompactMode, IsCompactMode } from "./CompactMode.ts";
 import { CleanUpNowBarComponents, CloseNowBar, DeregisterNowBarBtn, OpenNowBar } from "./NowBar.ts";
 import TransferElement from "./TransferElement.ts";
 import { IsPIP } from "./PopupLyrics.ts";
@@ -16,6 +16,9 @@ import { Spring } from "../../modules/Spring.ts";
 import { Maid } from "../../modules/Maid.ts";
 import Scheduler from "../../modules/Scheduler.ts";
 import { cancelCappedFrame, requestCappedFrame } from "../../utils/AnimationFrameLoop.ts";
+import Logger from "../../utils/Logger.ts";
+
+const fullscreenLogger = new Logger("Fullscreen");
 
 const Fullscreen = {
   Open,
@@ -164,6 +167,19 @@ export const SetControlsDragLock = (locked: boolean) => {
   if (!locked) ToggleControls(true);
 };
 
+// The spring's goal as a state on the MediaBox, for layouts that fade their controls with a short CSS
+// transition instead of following the spring (the view controls beside the cover, PlayerBelowCover.css).
+// Written only when it changes, so it costs one style change per hover change, not one per frame.
+const SetControlsState = (goal: number) => {
+  const mediaBox = PageContainer?.querySelector<HTMLElement>(".ContentBox .NowBar .Header .MediaBox");
+  if (!mediaBox) return;
+  const state = goal <= 0 ? "Hidden" : goal < 0.9 ? "Dim" : "Full";
+  if (mediaBox.dataset.controls !== state) mediaBox.dataset.controls = state;
+  // The Lyrics / Queue switch in the corner (QueueView.ts) comes and goes with the controls.
+  const viewSwitch = PageContainer?.querySelector<HTMLElement>(".ContentBox > .ViewSwitch");
+  if (viewSwitch && viewSwitch.dataset.controls !== state) viewSwitch.dataset.controls = state;
+};
+
 const ToggleControls = (force: boolean = false) => {
   if (controlsDragLock) return;
 
@@ -201,9 +217,11 @@ const ToggleControls = (force: boolean = false) => {
     spring.SetDampingRatio(immersive ? 1 : 2);
   }
 
-  controlsOpacitySpring.SetGoal(getControlsOpacityGoal());
+  const controlsGoal = getControlsOpacityGoal();
+  controlsOpacitySpring.SetGoal(controlsGoal);
   artworkBrightnessSpring.SetGoal(getArtworkBrightnessGoal());
   SyncFullscreenAlwaysShowClasses();
+  SetControlsState(controlsGoal);
 
   if (force || visualsApplied === false) {
     visualsApplied = true;
@@ -386,7 +404,7 @@ export const EnterSpicyLyricsFullscreen = async () => {
     }
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : String(err);
-    console.error(`Fullscreen error: ${errorMessage}`);
+    fullscreenLogger.error(`Fullscreen error: ${errorMessage}`);
   }
 
   pageDocument.documentElement.focus();
@@ -473,7 +491,7 @@ function Open(skipDocumentFullscreen: boolean = false, moveElement: boolean = tr
         getPageWindow().setTimeout(() => { if (stillOpen()) PageView.AppendViewControls(true); }, 50);
       } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : String(err);
-        console.error(`Fullscreen error: ${errorMessage}`);
+        fullscreenLogger.error(`Fullscreen error: ${errorMessage}`);
       }
     };
 

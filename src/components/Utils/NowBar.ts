@@ -8,6 +8,7 @@ import {
   $showVolumeSlider,
 } from "../../utils/stores.ts";
 import Defaults from "../Global/Defaults.ts";
+import { GetReleaseYear, PeekReleaseYear, type ReleaseYearQuery } from "../../utils/releaseYear.ts";
 import { onExperimentChange } from "../../utils/experiments.ts";
 import { $isNowBarOpen, $nowBarSide } from "../../utils/uiState.ts";
 import Global from "../Global/Global.ts";
@@ -25,6 +26,9 @@ import { IsCompactMode } from "./CompactMode.ts";
 import { Maid } from "../../modules/Maid.ts";
 import Scheduler from "../../modules/Scheduler.ts";
 import Whentil from "../../modules/Whentil.ts";
+import Logger from "../../utils/Logger.ts";
+
+const nowBarLogger = new Logger("Now Bar");
 
 // Spicetify's wrapper rescans every element's computed style on each childList
 // mutation, and textContent always replaces the text node. Editing it in place doesn't.
@@ -613,7 +617,7 @@ function OpenNowBar(skipSaving: boolean = false) {
 
         const SliderBar = TimelineElem.querySelector<HTMLElement>(".SliderBar");
         if (!SliderBar) {
-          console.error("Could not find SliderBar element");
+          nowBarLogger.error("Could not find SliderBar element");
           return null;
         }
         SliderBar.style.touchAction = "none";
@@ -659,7 +663,7 @@ function OpenNowBar(skipSaving: boolean = false) {
           const DurationElem = TimelineElem.querySelector<HTMLElement>(".Time.Duration");
 
           if (!PositionElem || !DurationElem || !SliderBar) {
-            console.error("Missing required elements for timeline update");
+            nowBarLogger.error("Missing required elements for timeline update");
             return;
           }
 
@@ -929,6 +933,7 @@ function OpenNowBar(skipSaving: boolean = false) {
                     <div class="VolumeFill"></div>
                     <div class="Handle"></div>
                     <div class="VolumeIcon">${Icons.Volume}</div>
+                    <div class="VolumeMaxIcon">${Icons.VolumeFull}</div>
                 `;
 
         // Same trick the Heart uses — the SVG would otherwise swallow the clicks
@@ -943,7 +948,7 @@ function OpenNowBar(skipSaving: boolean = false) {
 
         const IconElement = VolumeElement.querySelector<HTMLElement>(".VolumeIcon");
         if (!IconElement) {
-          console.error("Could not find VolumeControl elements");
+          nowBarLogger.error("Could not find VolumeControl elements");
           return null;
         }
 
@@ -1000,7 +1005,7 @@ function OpenNowBar(skipSaving: boolean = false) {
             Spicetify.Player.setMute?.(level <= 0);
             Spicetify.Player.setVolume(level);
           } catch (err) {
-            console.error("Spicy Lyrics: couldn't set the volume", err);
+            nowBarLogger.error("Couldn't set the volume", err);
           }
         };
 
@@ -1568,7 +1573,7 @@ async function getAVCStreamUrl(manifestUrl: string) {
                 }
 
             }).catch(err => {
-                console.error("Error while getting EditorialArtwork", err);
+                nowBarLogger.error("Error while getting EditorialArtwork", err);
             })
     }
 
@@ -1601,6 +1606,18 @@ async function navigateFromFullscreen(pathname: string) {
 // Each UpdateNowBar takes a token for its delayed metadata swap; a later update
 // (fast skipping) makes the earlier one's pending timers no-ops.
 let metadataUpdateToken = 0;
+
+function ReleaseYearQueryForPlaying(): ReleaseYearQuery | null {
+  if (SpotifyPlayer.GetContentType() === "episode") return null;
+  const uri = SpotifyPlayer.GetUri();
+  if (!uri) return null;
+  return {
+    uri,
+    title: SpotifyPlayer.GetName() ?? "",
+    artist: SpotifyPlayer.GetArtists()?.[0]?.name ?? "",
+    album: SpotifyPlayer.GetAlbumName() ?? "",
+  };
+}
 
 function UpdateNowBar(force = false) {
   const NowBar = PageContainer?.querySelector(".ContentBox .NowBar");
@@ -1641,6 +1658,11 @@ function UpdateNowBar(force = false) {
   //const SongName = NowBar.querySelector(".Header .Metadata .SongName");
 
   if (!$isNowBarOpen.get() && !force) return;
+
+  // Started now so the year is often known by the time the metadata swaps in.
+  const releaseYearQuery =
+    Defaults.ReleaseYearPosition !== "Off" && !SpotifyPlayer.IsDJ() ? ReleaseYearQueryForPlaying() : null;
+  if (releaseYearQuery) void GetReleaseYear(releaseYearQuery);
 
   const coverArt = SpotifyPlayer.GetCover("xlarge");
   const coverTrackUri = SpotifyPlayer.GetUri();
@@ -1936,14 +1958,17 @@ function UpdateNowBar(force = false) {
     const isDj = SpotifyPlayer.IsDJ();
     const syncReleaseYear = SpotifyPlayer.GetAlbumReleaseYearSync();
     const albumUri = SpotifyPlayer.GetAlbumUri();
-    const trackId = SpotifyPlayer.GetId();
     if (albumUri && syncReleaseYear) releaseYearCache.set(albumUri, syncReleaseYear);
 
-    const cachedReleaseYear = albumUri ? releaseYearCache.get(albumUri) : undefined;
+    const query = isDj ? null : ReleaseYearQueryForPlaying();
+    // Undefined while not looked up yet; null once a lookup found nothing.
+    const peekedReleaseYear = query ? PeekReleaseYear(query.uri) : null;
+    const knownReleaseYear =
+      syncReleaseYear ?? (albumUri ? releaseYearCache.get(albumUri) : undefined) ?? peekedReleaseYear ?? undefined;
+    const shouldFetchReleaseYear = !!query && !knownReleaseYear && peekedReleaseYear === undefined;
     const releaseYearToRender = isDj
       ? undefined
-      : syncReleaseYear ?? cachedReleaseYear ?? lastDisplayedReleaseYear;
-    const shouldFetchReleaseYear = !isDj && !syncReleaseYear && !!albumUri && !cachedReleaseYear;
+      : knownReleaseYear ?? (shouldFetchReleaseYear ? lastDisplayedReleaseYear : undefined);
     const shouldReserveReleaseYear =
       shouldFetchReleaseYear &&
       Defaults.ReleaseYearPosition !== "Off" &&
@@ -1951,50 +1976,14 @@ function UpdateNowBar(force = false) {
     applyReleaseYear(releaseYearToRender, shouldReserveReleaseYear);
     WatchMetadataMarquee(MetadataContainer);
 
-    if (shouldFetchReleaseYear) {
-      SpotifyPlayer.GetAlbumReleaseYear(albumUri).then((releaseYear) => {
+    if (query && shouldFetchReleaseYear) {
+      GetReleaseYear(query).then((releaseYear) => {
         if (!MetadataContainer.isConnected) return;
         if (metadataToken !== metadataUpdateToken || SpotifyPlayer.GetUri() !== updateUri) return;
-        if (releaseYear) releaseYearCache.set(albumUri, releaseYear);
-        applyReleaseYear(releaseYear);
+        if (releaseYear && albumUri) releaseYearCache.set(albumUri, releaseYear);
+        applyReleaseYear(releaseYear ?? undefined);
         WatchMetadataMarquee(MetadataContainer);
-        if (releaseYear || !trackId) {
-          revealMetadata();
-          return;
-        }
-        SpotifyPlayer.GetReleaseYear(trackId).then((trackReleaseYear) => {
-          if (!MetadataContainer.isConnected) return;
-          if (metadataToken !== metadataUpdateToken || SpotifyPlayer.GetUri() !== updateUri) return;
-          if (trackReleaseYear) releaseYearCache.set(albumUri, trackReleaseYear);
-          applyReleaseYear(trackReleaseYear);
-          WatchMetadataMarquee(MetadataContainer);
-          revealMetadata();
-        }).catch(() => {
-          if (!MetadataContainer.isConnected) return;
-          if (metadataToken !== metadataUpdateToken || SpotifyPlayer.GetUri() !== updateUri) return;
-          applyReleaseYear(undefined);
-          WatchMetadataMarquee(MetadataContainer);
-          revealMetadata();
-        });
-      }).catch(() => {
-        if (!trackId) {
-          revealMetadata();
-          return;
-        }
-        SpotifyPlayer.GetReleaseYear(trackId).then((trackReleaseYear) => {
-          if (!MetadataContainer.isConnected) return;
-          if (metadataToken !== metadataUpdateToken || SpotifyPlayer.GetUri() !== updateUri) return;
-          if (trackReleaseYear) releaseYearCache.set(albumUri, trackReleaseYear);
-          applyReleaseYear(trackReleaseYear);
-          WatchMetadataMarquee(MetadataContainer);
-          revealMetadata();
-        }).catch(() => {
-          if (!MetadataContainer.isConnected) return;
-          if (metadataToken !== metadataUpdateToken || SpotifyPlayer.GetUri() !== updateUri) return;
-          applyReleaseYear(undefined);
-          WatchMetadataMarquee(MetadataContainer);
-          revealMetadata();
-        });
+        revealMetadata();
       });
     } else {
       revealMetadata();
@@ -2019,8 +2008,12 @@ function NowBar_SwapSides() {
 }
 
 function ApplySideSwap() {
+  // Listeners measure before and after, so what sits on the lyrics side (the queue, QueueView.ts)
+  // can slide across with the lyrics instead of jumping.
+  Global.Event.evoke("nowbar:side-swap:before", null);
   $nowBarSide.set($nowBarSide.get() === "right" ? "left" : "right");
   Session_NowBar_SetSide();
+  Global.Event.evoke("nowbar:side-swap:after", null);
 }
 
 // The side the page shows: the stored one, except that compact mode and the centred

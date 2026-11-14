@@ -156,12 +156,8 @@ body.player-floating:has(.glassify-bg) #SpicyLyricsPage:not(.Fullscreen) .ViewCo
 #SpicyLyricsPage .ViewControls .ViewControl {
   --ViewControlHeight: var(--ViewControlSize, 100cqh);
   aspect-ratio: 1;
-  background: color-mix(in srgb, var(--material-regular-bg) 30%, transparent) !important;
-  -webkit-backdrop-filter: blur(4px) saturate(1.12) brightness(1.01);
-  backdrop-filter: blur(4px) saturate(1.12) brightness(1.01);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 50%;
-  box-sizing: border-box;
+  border: 0;
+  border-radius: 100rem;
   display: flex;
   flex-shrink: 0;
   height: var(--ViewControlHeight);
@@ -174,12 +170,23 @@ body.player-floating:has(.glassify-bg) #SpicyLyricsPage:not(.Fullscreen) .ViewCo
   text-align: center;
   -webkit-box-align: center;
   -webkit-box-pack: center;
-  box-shadow: 0 10px 24px -8px rgba(8, 10, 18, 0.42);
-  transition: scale 0.28s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: scale 0.28s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   transform-origin: center;
 }
 
-#SpicyLyricsPage .ViewControls .ViewControl:hover {
+/* Separate glass buttons. The :where() keeps these at their old weight while staying out of the
+   grouped capsule (GroupedViewControls.css). */
+#SpicyLyricsPage:where(:not(.Exp_GroupedViewControls)) .ViewControls .ViewControl {
+  background: color-mix(in srgb, var(--material-regular-bg) 30%, transparent) !important;
+  -webkit-backdrop-filter: blur(4px) saturate(1.12) brightness(1.01);
+  backdrop-filter: blur(4px) saturate(1.12) brightness(1.01);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  box-sizing: border-box;
+  box-shadow: 0 10px 24px -8px rgba(8, 10, 18, 0.42);
+}
+
+#SpicyLyricsPage:where(:not(.Exp_GroupedViewControls)) .ViewControls .ViewControl:hover {
   color: #fff;
   background: rgba(255, 255, 255, 0.045) !important;
   -webkit-backdrop-filter: var(--material-regular-blur);
@@ -194,7 +201,7 @@ body.player-floating:has(.glassify-bg) #SpicyLyricsPage:not(.Fullscreen) .ViewCo
   backdrop-filter: var(--material-regular-blur);
 }
 
-#SpicyLyricsPage .ViewControls .ViewControl:active {
+#SpicyLyricsPage:where(:not(.Exp_GroupedViewControls)) .ViewControls .ViewControl:active {
   scale: 0.94;
 }
 
@@ -222,11 +229,11 @@ body.player-floating:has(.glassify-bg) #SpicyLyricsPage:not(.Fullscreen) .ViewCo
 }
 
 #SpicyLyricsPage.NowBarSide__Right .ViewControls #NowBarSideToggle .SL_IconCover {
-  transform: translateX(7px);
+  transform: translateX(10px);
 }
 
 #SpicyLyricsPage.NowBarSide__Right .ViewControls .SL_IconSwapArrow {
-  transform: translateX(-8px) rotate(180deg);
+  transform: translateX(-11.5px) rotate(180deg);
 }
 
 /* Hover leans each part toward what the button will do: corners out, the gear a tooth on. */
@@ -236,8 +243,37 @@ body.player-floating:has(.glassify-bg) #SpicyLyricsPage:not(.Fullscreen) .ViewCo
   #SpicyLyricsPage .ViewControls .ViewControl:hover .SL_NudgeBR { translate: 1px 1px; }
   #SpicyLyricsPage .ViewControls .ViewControl:hover .SL_NudgeBL { translate: -1px 1px; }
   #SpicyLyricsPage .ViewControls .ViewControl:hover .SL_IconGear { rotate: 45deg; }
+  /* The swap arrow leans at the side the cover will move to, whichever way it points. */
+  #SpicyLyricsPage .ViewControls .ViewControl:hover .SL_IconSwapArrow { translate: 1px 0; }
+  #SpicyLyricsPage.NowBarSide__Right .ViewControls .ViewControl:hover .SL_IconSwapArrow { translate: -1px 0; }
 }
 
+/* A glyph that replaced another on its own button's click (Icons.ts) settles in, so the press
+   visibly changed the state. Buttons rebuilt for any other reason appear as they are. */
+#SpicyLyricsPage .ViewControls .ViewControl svg.SL_IconSwapIn {
+  animation: SL_IconSwapIn 0.2s var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
+}
+
+@keyframes SL_IconSwapIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #SpicyLyricsPage .ViewControls .ViewControl svg.SL_IconSwapIn {
+    animation-name: SL_IconSwapInFade;
+  }
+}
+
+@keyframes SL_IconSwapInFade {
+  from {
+    opacity: 0;
+  }
+}
+
+#SpicyLyricsPage .ViewControls .SL_IconSwapArrow,
 #SpicyLyricsPage .ViewControls .SL_NudgeTL,
 #SpicyLyricsPage .ViewControls .SL_NudgeTR,
 #SpicyLyricsPage .ViewControls .SL_NudgeBR,

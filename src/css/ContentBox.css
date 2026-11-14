@@ -283,7 +283,6 @@
   overflow: hidden; /* Hides overflowing text */
   display: inline-block; /* Ensures width is respected */
   text-align: center; /* Align text within the span */
-  animation: Marquee_SongName 25s linear infinite alternate;
   padding: 0 3cqw 0 2.5cqw;
 }
 
@@ -1080,7 +1079,7 @@
   height: 9cqh;
 }
 
-#SpicyLyricsPage.Fullscreen
+#SpicyLyricsPage.Fullscreen:where(:not(.Exp_GroupedViewControls))
   .ContentBox
   .NowBar
   .CenteredView
@@ -1099,7 +1098,7 @@
 
 /* Fullscreen :hover — re-apply the luminous halo (needs !important to
    beat the base rule above that locks box-shadow with !important). */
-#SpicyLyricsPage.Fullscreen
+#SpicyLyricsPage.Fullscreen:where(:not(.Exp_GroupedViewControls))
   .ContentBox
   .NowBar
   .CenteredView
@@ -2380,7 +2379,7 @@
 #SpicyLyricsPage.Fullscreen.ForcedCompactMode
   .ContentBox
   .NowBar:has(.CenteredView .Header .MediaBox:hover) {
-  height: calc(var(--Compact_NowBarHeight) + 40cqw);
+  height: calc(var(--Compact_NowBarHeight) + var(--Compact_HoverGrow, 40cqw));
 }
 
 #SpicyLyricsPage.CompactMode.CompactifyEnabledCompactMode
@@ -2389,11 +2388,11 @@
 #SpicyLyricsPage.ForcedCompactMode.CompactifyEnabledCompactMode
   .LyricsContainer
   .LyricsContent {
-  --DefaultLyricsSize: clamp(3rem, calc(1cqw * 7), 4rem);
+  --DefaultLyricsSize: calc(clamp(3rem, calc(1cqw * 7), 4rem) * var(--SL-LyricsScale, 1));
 }
 
 #SpicyLyricsPage.TippyMode .LyricsContainer .LyricsContent {
-  --DefaultLyricsSize: clamp(2.5rem, calc(1cqw * 7), 3.5rem);
+  --DefaultLyricsSize: calc(clamp(2.5rem, calc(1cqw * 7), 3.5rem) * var(--SL-LyricsScale, 1));
 }
 
 #SpicyLyricsPage.Fullscreen.CompactMode.SpicyRenderer:has(.MediaBox:hover)
@@ -2402,7 +2401,7 @@
 #SpicyLyricsPage.Fullscreen.ForcedCompactMode.SpicyRenderer:has(.MediaBox:hover)
   .ContentBox
   .LyricsContainer {
-  margin-top: calc(var(--Compact_NowBarHeight) + 50cqw);
+  margin-top: calc(var(--Compact_NowBarHeight) + var(--Compact_HoverPush, 50cqw));
 }
 
 .spicy-pip-wrapper
@@ -2432,7 +2431,7 @@
   .CenteredView
   .Header:has(.MediaBox:hover)
   .Metadata {
-  opacity: 0;
+  opacity: var(--Compact_HoverMetaOpacity, 0);
 }
 
 #SpicyLyricsPage.CompactMode.LyricsRenderer
@@ -2640,7 +2639,7 @@
   ).ForcedCompactMode:has(.NowBar.LockedMediaBox)
   .ContentBox
   .LyricsContainer {
-  margin-top: calc(var(--Compact_NowBarHeight) + 18cqw);
+  margin-top: calc(var(--Compact_NowBarHeight) + var(--Compact_HoverPush, 18cqw));
 }
 
 #SpicyLyricsPage.Fullscreen:not(.CompactifyEnabledCompactMode).CompactMode
@@ -2655,7 +2654,7 @@
 #SpicyLyricsPage.Fullscreen.ForcedCompactMode:not(.CompactifyEnabledCompactMode)
   .ContentBox
   .NowBar.LockedMediaBox {
-  height: calc(var(--Compact_NowBarHeight) + 15cqw);
+  height: calc(var(--Compact_NowBarHeight) + var(--Compact_HoverGrow, 15cqw));
 }
 
 #SpicyLyricsPage.CompactMode .ContentBox .NowBar .Header .MediaBox .MediaImageContainer,

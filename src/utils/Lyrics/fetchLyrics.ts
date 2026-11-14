@@ -2,10 +2,11 @@ import Defaults, { isDev } from "../../components/Global/Defaults.ts";
 import { $currentLyricsData, $currentLyricsType, $currentlyFetching } from "../stores.ts";
 import { SpotifyPlayer } from "../../components/Global/SpotifyPlayer.ts";
 import PageView, { PageContainer } from "../../components/Pages/PageView.ts";
-import { ProcessLyrics } from "./ProcessLyrics.ts";
+import { JapaneseRomajiIsCurrent, ProcessLyrics } from "./ProcessLyrics.ts";
 import { IsEmptyLyrics } from "./EmptyLines.ts";
 import Logger from "../Logger.ts";
 import { LocalLyricsManager } from "./manager/index.ts";
+import { ParseTTML } from "./manager/parseTTML.ts";
 import { GetExpireStore } from "../../modules/Store.ts";
 import { fetchLyricsFromProviders } from "./ExternalSources.ts";
 import {
@@ -106,6 +107,35 @@ function attachLyricsSourceCacheMetadata(lyrics: any): any {
   };
 }
 
+/** Which stage last served lyrics, for the bug report: a cached copy is the usual suspect. */
+let lastAnswer: { uri: string; from: string } | null = null;
+
+/** Where `uri`'s lyrics came from, or `null` if it hasn't been served lyrics. */
+export function GetLyricsAnsweredFrom(uri: string | undefined): string | null {
+  return uri && lastAnswer?.uri === uri ? lastAnswer.from : null;
+}
+
+/** An upload made "Just once" for `uri`, read from `$currentLyricsData`. */
+function readTemporaryUpload(saved: string, uri: string): any | null {
+  if (!saved.startsWith("{")) return null;
+  try {
+    const data = JSON.parse(saved);
+    if (data?.temporaryUpload !== true) return null;
+    return data.uri === uri || (data.id && data.id === getSongKey(uri)) ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Whether `uri` is showing a "Just once" TTML upload. It exists only in
+ * `$currentLyricsData`, so clearing that to refetch would replace it with the
+ * song's normal lyrics.
+ */
+export function HoldsTemporaryUpload(uri: string | undefined): boolean {
+  return Boolean(uri && readTemporaryUpload($currentLyricsData.get(), uri));
+}
+
 function isLyricsCacheCompatible(data: any): boolean {
   if (!isProviderFetchedLyricsCache(data)) return true;
   return data.LyricsSourceCacheSignature === getLyricsSourceCacheSignature();
@@ -186,6 +216,12 @@ async function fetchLyricsInternal(
     return ["dj", 400];
   }
 
+  // Ads (music ads, podcast pre-rolls) can be audio or video, so this goes before the media checks.
+  if (SpotifyPlayer.GetContentType() === "ad") {
+    finishFetching(uri);
+    return ["ad", 400];
+  }
+
   const mediaType = SpotifyPlayer.GetMediaType();
 
   if (mediaType && mediaType !== "audio") {
@@ -222,7 +258,8 @@ async function fetchLyricsInternal(
   // Check if there's already data in localStorage
   const savedLyricsData = $currentLyricsData.get();
 
-  if (savedLyricsData && !isDev) {
+  // Dev builds always refetch, except for an upload that nothing could refetch.
+  if (savedLyricsData && (!isDev || HoldsTemporaryUpload(uri))) {
     try {
       if (savedLyricsData.startsWith("NO_LYRICS:")) {
         const savedUri = savedLyricsData.slice("NO_LYRICS:".length);
@@ -233,9 +270,35 @@ async function fetchLyricsInternal(
           return ["lyrics-not-found", 404];
         }
       } else {
-        const lyricsData = JSON.parse(savedLyricsData);
+        let lyricsData = JSON.parse(savedLyricsData);
         // Return the stored lyrics if the ID matches the track ID
         if ((lyricsData?.id === trackId || lyricsData?.uri === uri) && isLyricsCacheCompatible(lyricsData)) {
+          // A "Just once" upload made with the other Japanese spelling is romanized again
+          // from its own TTML, since its processed syllables keep the old romaji.
+          if (
+            lyricsData.temporaryUpload === true &&
+            typeof lyricsData.uploadedTTML === "string" &&
+            !JapaneseRomajiIsCurrent(lyricsData)
+          ) {
+            const reparsed = (await ParseTTML(lyricsData.uploadedTTML))?.Result;
+            if (reparsed) {
+              const refreshed = {
+                ...reparsed,
+                id: lyricsData.id,
+                userUploaded: true,
+                temporaryUpload: true,
+                uploadedTTML: lyricsData.uploadedTTML,
+              };
+              await ProcessLyrics(refreshed);
+              if (!isCurrentTrack(uri)) return [refreshed, 200];
+              // Something saved meanwhile (another upload) is newer, so answer with that.
+              if ($currentLyricsData.get() !== savedLyricsData) return fetchLyricsInternal(uri, options);
+              lyricsData = refreshed;
+              $currentLyricsData.set(JSON.stringify(lyricsData));
+            }
+          }
+          // Shown again: keep where they first came from, when that's known.
+          if (lastAnswer?.uri !== uri) lastAnswer = { uri, from: "already loaded" };
           const preparedLyrics = await prepareLyricsForPresentation(lyricsData);
           await presentLyrics(uri, preparedLyrics);
           return [preparedLyrics, 200];
@@ -255,6 +318,7 @@ async function fetchLyricsInternal(
 
   const localLyric = await LocalLyricsManager.get(uri);
   if (localLyric) {
+    lastAnswer = { uri, from: "Local DB" };
     return presentStoredLyrics(uri, { ...localLyric, id: trackId });
   }
 
@@ -271,7 +335,8 @@ async function fetchLyricsInternal(
   if (LyricsStore) {
     try {
       const lyricsFromCache = await LyricsStore.GetItem(trackId);
-      if (lyricsFromCache) {
+      // Romaji in the other Japanese spelling is fetched and romanized again.
+      if (lyricsFromCache && JapaneseRomajiIsCurrent(lyricsFromCache)) {
         if (lyricsFromCache.Value === "NO_LYRICS") {
           finishFetching(uri);
           HideLoaderContainer(uri);
@@ -279,6 +344,7 @@ async function fetchLyricsInternal(
           return ["lyrics-not-found", 404];
         }
         if (isLyricsCacheCompatible(lyricsFromCache)) {
+          lastAnswer = { uri, from: "cache" };
           return await presentStoredLyrics(uri, { ...lyricsFromCache, fromCache: true });
         }
         void LyricsStore.RemoveItem(trackId).catch(() => {});
@@ -321,7 +387,7 @@ async function fetchLyricsInternal(
       return ["lyrics-not-found", 404];
     }
 
-    await ProcessLyrics(lyrics);
+    const romanizedInFull = await ProcessLyrics(lyrics);
 
     if (IsEmptyLyrics(lyrics)) {
       lyricsLogger.warn("Lyrics payload had no renderable lines after pruning");
@@ -334,7 +400,9 @@ async function fetchLyricsInternal(
     const lyricsWithId = attachLyricsSourceCacheMetadata({ ...lyrics, id: trackId });
     if (isCurrentTrack(uri)) $currentLyricsData.set(JSON.stringify(lyricsWithId));
 
-    if (LyricsStore) {
+    // Lyrics whose romanization was cut short (the Japanese dictionary still loading,
+    // say) aren't cached, so the next play romanizes them in full.
+    if (LyricsStore && romanizedInFull) {
       try {
         await LyricsStore.SetItem(trackId, lyricsWithId);
       } catch (error) {
@@ -342,6 +410,7 @@ async function fetchLyricsInternal(
       }
     }
 
+    lastAnswer = { uri, from: "lyrics sources" };
     await presentLyrics(uri, lyricsWithId);
     return [{ ...lyricsWithId, fromCache: false }, 200];
   } catch (error) {

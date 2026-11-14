@@ -15,6 +15,7 @@ import { BackgroundAnimationController, type AudioAnalysisData } from "./Backgro
 import { getDynamicAudioAnalysis } from "../../utils/audioAnalysis.ts";
 import Logger from "../../utils/Logger.ts";
 import { onAnimationFrame } from "../../utils/AnimationFrameLoop.ts";
+import { MotionClock, TrackMotion } from "./BackgroundMotion.ts";
 
 const dynamicBgLogger = new Logger("Dynamic Background");
 
@@ -86,7 +87,16 @@ function startKawarp(kawarp: Kawarp, canvas: HTMLElement, key: HTMLElement | str
       startKawarp(kawarp, canvas, key);
       return;
     }
-    if (!suspendedKawarpKeys.has(key)) kawarp.renderFrame();
+    if (suspendedKawarpKeys.has(key)) return;
+    const reactive = stepMotionClock();
+    // A no-op unless the pass count changes (the page moving into or out of the popup).
+    kawarp.blurPasses = blurPassesFor(kawarp, key, reactive);
+    if (!reactive) {
+      kawarp.renderFrame();
+      return;
+    }
+    if (kawarp.scale !== motionClock.scale) kawarp.scale = motionClock.scale;
+    kawarp.renderFrame(motionClock.time);
   }, targetWindow);
 }
 
@@ -106,6 +116,102 @@ export function SetKawarpSuspended(key: HTMLElement | string, suspended: boolean
   else playKawarp(kawarp);
 }
 
+// ─── Music-driven clock ──────────────────────────────────────────────────────
+//
+// With `musicReactiveBackground` on, the time each instance renders at comes from
+// BackgroundMotion's clock, stepped here on every frame from the playback position,
+// instead of from Kawarp's own speed-eased clock. Off, Kawarp keeps its own clock and
+// the 10 Hz speed controller below drives it, as before.
+
+const motionClock = new MotionClock();
+/** The analysis model of the track it belongs to; `model` is null when the track has none. */
+let motionTrack: { uri: string; model: TrackMotion | null } | null = null;
+let lastMotionFrame: number | null = null;
+let motionDriving = false;
+
+/** Kawarp's private clock fields; plain fields, read only to hand the clock over without a jump. */
+type KawarpClock = { accumulatedTime: number; lastFrameTime: number };
+
+function handOverClock(toMotion: boolean) {
+  motionDriving = toMotion;
+  lastMotionFrame = null;
+  if (toMotion) {
+    // Pick up where the field is now, so taking over doesn't jump it.
+    const first = KawarpMap.values().next().value as unknown as KawarpClock | undefined;
+    if (first) motionClock.seed(first.accumulatedTime);
+    return;
+  }
+  KawarpMap.forEach((kawarp) => {
+    const clock = kawarp as unknown as KawarpClock;
+    clock.accumulatedTime = motionClock.time;
+    clock.lastFrameTime = performance.now();
+    kawarp.scale = KawarpOptionsStatic.scale ?? 1;
+  });
+}
+
+/** Read-only view of the music-driven clock, for `SpicyLyrics.testing.backgroundMotion()`. */
+export function getBackgroundMotionState() {
+  const { time, rate, scale, energy, play, follow } = motionClock;
+  return {
+    driving: motionDriving,
+    track: motionTrack ? { uri: motionTrack.uri, analyzed: motionTrack.model !== null } : null,
+    time,
+    rate,
+    scale,
+    energy,
+    play,
+    follow,
+    instances: [...KawarpMap].map(([key, kawarp]) => ({
+      key: typeof key === "string" ? key : key.id || key.className,
+      rendering: runningKawarps.has(kawarp) && !suspendedKawarpKeys.has(key),
+      inPopup: kawarpCanvases.get(kawarp)?.ownerDocument !== document,
+      blurPasses: kawarp.blurPasses,
+      scale: kawarp.scale,
+    })),
+  };
+}
+
+function setMotionTrack(uri: string, data: AudioAnalysisData | null) {
+  if (motionTrack?.uri === uri && (motionTrack.model !== null || !data)) return;
+  motionTrack = { uri, model: data ? new TrackMotion(data) : null };
+}
+
+// Each instance renders from its own window's loop (a popout keeps rendering while
+// Spotify's window is hidden), so the clock steps from whichever loop reaches it first
+// in a frame, timed on this window's clock. Returns whether the music drives the clock.
+const MOTION_FRAME_MIN_MS = 4;
+function stepMotionClock(): boolean {
+  const reactive = isExperimentEnabled("musicReactiveBackground");
+  if (reactive !== motionDriving) handOverClock(reactive);
+  if (!reactive) return false;
+  const now = performance.now();
+  if (lastMotionFrame !== null && now - lastMotionFrame < MOTION_FRAME_MIN_MS) return true;
+  const uri = SpotifyPlayer.GetUri();
+  motionClock.step({
+    dt: lastMotionFrame === null ? 0 : (now - lastMotionFrame) / 1000,
+    position: SpotifyPlayer.GetPosition() / 1000,
+    playing: SpotifyPlayer.IsPlaying,
+    reducedMotion: reducedMotion.matches,
+    track: motionTrack && motionTrack.uri === uri ? motionTrack.model : null,
+  });
+  lastMotionFrame = now;
+  return true;
+}
+
+/**
+ * Blur passes for the page background in the main window (the lyrics page, Cinema View
+ * and fullscreen) while the music drives it: lighter than the default, so the cover's
+ * shapes stay readable enough to see them flow. The popup and the NPV, which are small,
+ * keep the full blur.
+ */
+const PAGE_BLUR_PASSES = 7;
+
+function blurPassesFor(kawarp: Kawarp, key: HTMLElement | string, reactive: boolean): number {
+  const full = KawarpOptionsStatic.blurPasses ?? 8;
+  if (!reactive || key !== PAGE_BACKGROUND_KEY) return full;
+  // The popup shows the same page, moved into the Document PiP window.
+  return kawarpCanvases.get(kawarp)?.ownerDocument === document ? PAGE_BLUR_PASSES : full;
+}
 
 // ─── Layers ──────────────────────────────────────────────────────────────────
 //
@@ -121,6 +227,8 @@ const layerSettleMs = () => (isRefined() ? 1500 : 1000);
 
 /** Kawarp instances by their canvas, so a retired canvas disposes its own. */
 const canvasKawarps = new WeakMap<Element, Kawarp>();
+/** And the other way round, to tell which window an instance is drawing in. */
+const kawarpCanvases = new WeakMap<Kawarp, HTMLCanvasElement>();
 
 /** The host's current layer of one kind, ignoring layers on their way out. */
 function liveLayer(host: HTMLElement, kind: string): HTMLElement | null {
@@ -516,7 +624,10 @@ async function applyKawarpBackground(host: HTMLElement, key: string, track: Trac
   appliedSpeeds.set(kawarp, currentSpeed);
   KawarpMap.set(key, kawarp);
   canvasKawarps.set(canvas, kawarp);
+  kawarpCanvases.set(kawarp, canvas);
   host.appendChild(canvas);
+  // Set before the first image, so it isn't blurred twice.
+  kawarp.blurPasses = blurPassesFor(kawarp, key, isExperimentEnabled("musicReactiveBackground"));
 
   try {
     await loadCoverProgressively(kawarp, source, track.previewUrl, track.isStale, () =>
@@ -831,19 +942,26 @@ Global.Event.listen("playback:progress", async () => {
   const songUri = SpotifyPlayer.GetUri();
   // Local tracks have no Spotify audio analysis.
   if (!songUri || songUri.startsWith("spotify:local:")) {
+    if (songUri) setMotionTrack(songUri, null);
     setAnimationSpeed(1);
     return;
   }
 
   latestPlaybackTrackUri = songUri;
   const audioAnalysisData = await getAudioAnalysisForTrack(songUri);
+
+  // Prevent stale async results from old tracks applying after rapid song switches.
+  if (SpotifyPlayer.GetUri() !== songUri || latestPlaybackTrackUri !== songUri) return;
+
+  // The music-driven clock reads the analysis itself, every frame.
+  if (isExperimentEnabled("musicReactiveBackground")) {
+    setMotionTrack(songUri, audioAnalysisData);
+    return;
+  }
   if (!audioAnalysisData) {
     setAnimationSpeed(1);
     return;
   }
-
-  // Prevent stale async results from old tracks applying after rapid song switches.
-  if (SpotifyPlayer.GetUri() !== songUri || latestPlaybackTrackUri !== songUri) return;
 
   pruneAudioAnalysisCache(songUri);
   setAnimationSpeed(animSpeedController.getSpeedMultiplier(SpotifyPlayer.GetPosition() / 1000, audioAnalysisData));

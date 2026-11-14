@@ -1,4 +1,15 @@
+import Logger from "./Logger.ts";
 import { $animationFpsCap, $animationFpsCapEnabled } from "./stores.ts";
+
+const frameLogger = new Logger("Animation Frame");
+
+/**
+ * One requestAnimationFrame loop shared by everything that repaints every frame
+ * (the lyrics animator and the Kawarp backgrounds), capped by `$animationFpsCap`.
+ *
+ * Both have to render on the *same* frames: if each capped itself on its own
+ * schedule, the page would still be repainted on the union of their frames.
+ */
 
 type FrameCallback = (timestamp: number) => void;
 type FrameLoop = {
@@ -57,7 +68,7 @@ function run(callback: FrameCallback, timestamp: number): void {
     reportedErrors.delete(callback);
   } catch (error) {
     if (!reportedErrors.has(callback)) {
-      console.error("Spicy Lyrics: animation frame callback failed", error);
+      frameLogger.error("Animation frame callback failed", error);
       reportedErrors.add(callback);
     }
   }

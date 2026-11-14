@@ -2141,6 +2141,15 @@ export function Animate(position: number): void {
                     (k === activeLetterIndex ? -50 + 150 * activeLetterPercentage : targetGradient);
                 }
 
+                // Slider-created letter groups get the real per-letter lift,
+                // while their fill remains one smooth word wipe instead of
+                // stepping from glyph to glyph.
+                if ((word as any).ThresholdLetterGroup && !waveFlame) {
+                  targetGradient = simpleFamily()
+                    ? -50 + 120 * percentage
+                    : -20 + 120 * percentage;
+                }
+
                 // Apply the calculated gradient
                 if (simpleFamily()) {
                   setStyleIfChanged(letter.HTMLElement, "--SLM_GradientPosition", `${targetGradient}%`);

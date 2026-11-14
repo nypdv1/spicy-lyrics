@@ -89,7 +89,8 @@ export default function Emphasize(
   lead: any,
   isBgWord: boolean = false,
   parts?: SyllablePart[],
-  flameGroup: FlameGroup | null = null
+  flameGroup: FlameGroup | null = null,
+  thresholdSplit = false
 ) {
   const Substractions = getSubstractions();
   const StartTime = ConvertTime(lead.StartTime) - Substractions.StartTime;
@@ -181,6 +182,7 @@ export default function Emphasize(
       TotalTime: totalDuration,
       LetterGroup: true,
       Letters,
+      ...(thresholdSplit ? { ThresholdLetterGroup: true } : {}),
       ...(parts ? { Paced: true } : {}),
       ...(flameGroup ? { FlameGroup: flameGroup, FlameOffset } : {}),
       ...mcont,

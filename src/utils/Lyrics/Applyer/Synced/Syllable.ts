@@ -1,5 +1,6 @@
 import {
   $lyricsContainerExists,
+  $longWordThreshold,
   $minimalLyricsMode,
   $simpleLyricsMode,
   $spaceGravityMode,
@@ -158,7 +159,15 @@ function pacedParts(
 // Bloom judges a word sung in syllables as a whole: whether it's split into
 // letters, and how far the fill edge runs past it, go by the whole word's
 // letters and length. Spring keeps judging each syllable alone.
-type WordPlan = { Letters: string[]; Split: boolean; WordLetters: number; Group: FlameGroup | null };
+type WordPlan = {
+  Letters: string[];
+  Split: boolean;
+  // A user-selected short split keeps the word's fill synchronized across its
+  // letters. Native long-word splits keep their existing letter-by-letter fill.
+  ThresholdSplit: boolean;
+  WordLetters: number;
+  Group: FlameGroup | null;
+};
 
 function planWords(
   parts: SyllableData[],
@@ -168,8 +177,11 @@ function planWords(
 ): WordPlan[] {
   const texts = parts.map((part) => StripZeroWidth(getSyllableText(part, useRomanized)));
   const durations = parts.map((part) => ConvertTime(part.EndTime) - ConvertTime(part.StartTime));
+  const minimum = MinLetterCapableDuration();
+  const canUseThresholdSplit = (duration: number) =>
+    allowLetters && duration >= $longWordThreshold.get();
   const lettersOf = (i: number, duration: number) =>
-    allowLetters && duration >= MinLetterCapableDuration() ? SplitLetters(texts[i]) : [];
+    (allowLetters && duration >= minimum) || canUseThresholdSplit(duration) ? SplitLetters(texts[i]) : [];
   const plans: WordPlan[] = [];
   for (let i = 0; i < parts.length; i++) {
     let end = i;
@@ -180,8 +192,11 @@ function planWords(
       const letters = lettersOf(i, durations[i]);
       plans.push({
         Letters: letters,
-        Split:
-          letters.length > 0 && IsLetterCapable(letters.length, durations[i], isBackground) && !isRtl(texts[i]),
+        Split: letters.length > 0 &&
+          (IsLetterCapable(letters.length, durations[i], isBackground) ||
+            (canUseThresholdSplit(durations[i]) && !isBackground)) &&
+          !isRtl(texts[i]),
+        ThresholdSplit: durations[i] < minimum && canUseThresholdSplit(durations[i]) && !isBackground,
         WordLetters: letters.length || SplitLetters(texts[i]).length,
         Group: null,
       });
@@ -192,13 +207,16 @@ function planWords(
     const total = letters.reduce((sum, l) => sum + l.length, 0);
     const split =
       total > 0 &&
-      IsLetterCapable(total, duration, isBackground) &&
+      (IsLetterCapable(total, duration, isBackground) ||
+        (canUseThresholdSplit(duration) && !isBackground)) &&
       !texts.slice(i, end + 1).some((text) => isRtl(text));
+    const thresholdSplit = duration < minimum && canUseThresholdSplit(duration) && !isBackground;
     const group = split ? createFlameGroup(parts[i].StartTime, parts[end].EndTime) : null;
     for (let k = 0; k <= end - i; k++) {
       plans.push({
         Letters: letters[k],
         Split: split && letters[k].length > 0,
+        ThresholdSplit: thresholdSplit,
         WordLetters: total || texts.slice(i, end + 1).join("").length,
         Group: group,
       });
@@ -599,7 +617,7 @@ export function ApplySyllableLyrics(
 
       if (plan.Split) {
         word = document.createElement("div");
-        Emphasize(letters, word, lead, false, pacedParts(lead, ShowRomanized, letters.length), plan.Group);
+        Emphasize(letters, word, lead, false, pacedParts(lead, ShowRomanized, letters.length), plan.Group, plan.ThresholdSplit);
         tagWordLetters(plan.WordLetters);
 
         if (isLastInLine) {
@@ -718,7 +736,7 @@ export function ApplySyllableLyrics(
 
           if (plan.Split) {
             bwE = document.createElement("div");
-            Emphasize(plan.Letters, bwE, bw, true, pacedParts(bw, ShowRomanized, plan.Letters.length), plan.Group);
+            Emphasize(plan.Letters, bwE, bw, true, pacedParts(bw, ShowRomanized, plan.Letters.length), plan.Group, plan.ThresholdSplit);
             tagWordLetters(plan.WordLetters);
 
             if (isLastInLine) {

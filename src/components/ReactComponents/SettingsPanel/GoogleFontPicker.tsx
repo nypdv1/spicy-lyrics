@@ -13,25 +13,27 @@ interface Props {
   className: string;
   disabled?: boolean;
   label: string;
+  source: "google" | "system";
   value: string;
+  onSourceChange: (source: "google" | "system") => void;
   onChange: (value: string) => void;
 }
 
-/** An editable picker: suggestions are convenient, while any Google Font family still works. */
-export function GoogleFontPicker({ className, disabled, label, value, onChange }: Props) {
+/** A font-source picker with a visual Google Font menu and a separate system-font field. */
+export function GoogleFontPicker({ className, disabled, label, source, value, onSourceChange, onChange }: Props) {
+  const options = value && !GOOGLE_FONT_SUGGESTIONS.includes(value) ? [value, ...GOOGLE_FONT_SUGGESTIONS] : GOOGLE_FONT_SUGGESTIONS;
   return <>
-    <input
-      className={className}
-      aria-label={label}
-      disabled={disabled}
-      list="spicy-lyrics-google-fonts"
-      placeholder="Search Google Fonts…"
-      value={value}
-      onChange={(event) => onChange(event.currentTarget.value)}
-      spellCheck={false}
-    />
-    <datalist id="spicy-lyrics-google-fonts">
-      {GOOGLE_FONT_SUGGESTIONS.map((font) => <option key={font} value={font} />)}
-    </datalist>
+    <span className="sl-sp-btn-group" role="group" aria-label={`${label} source`}>
+      <button className="sl-sp-btn" type="button" disabled={disabled} aria-pressed={source === "google"} onClick={() => onSourceChange("google")}>Google Fonts</button>
+      <button className="sl-sp-btn" type="button" disabled={disabled} aria-pressed={source === "system"} onClick={() => onSourceChange("system")}>System Font</button>
+    </span>
+    {source === "google" ? (
+      <select className={className} aria-label={label} disabled={disabled} value={value} onChange={(event) => onChange(event.currentTarget.value)}>
+        <option value="">Choose a Google Font…</option>
+        {options.map((font) => <option key={font} value={font} style={{ fontFamily: `"${font}"` }}>{font}</option>)}
+      </select>
+    ) : (
+      <input className={className} aria-label={label} disabled={disabled} placeholder="e.g. Spotify Mix, Arial" value={value} onChange={(event) => onChange(event.currentTarget.value)} spellCheck={false} />
+    )}
   </>;
 }

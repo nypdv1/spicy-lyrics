@@ -4,6 +4,7 @@ import {
   $animationFpsCapEnabled,
   $customFont,
   $customFontEnabled,
+  $customFontSource,
   $skipSpicyFont,
   $useUpstreamSettingsLayout,
 } from "../../../../utils/stores.ts";
@@ -42,12 +43,12 @@ const groups: GroupDef[] = [
       },
       {
         id: "customFont",
-        label: "Google Font",
-        description: "Select a Google Font or enter an installed font family. Google Fonts load through coolLabs Fonts.",
-        keywords: "google font family typeface coollabs",
+        label: "Font Picker",
+        description: "Choose a Google Font or enter an installed system font. Google Fonts load through coolLabs Fonts.",
+        keywords: "google system font family typeface coollabs",
         useDisabled: () => !useStore($customFontEnabled) && "Turn on Use Custom Font to change this.",
         Control: ({ disabled, label }) => (
-          <GoogleFontPicker className="sl-us-text-input" label={label} disabled={disabled} value={useStore($customFont)} onChange={(value) => $customFont.set(value)} />
+          <GoogleFontPicker className="sl-us-text-input" label={label} disabled={disabled} source={useStore($customFontSource)} value={useStore($customFont)} onSourceChange={(source) => $customFontSource.set(source)} onChange={(value) => $customFont.set(value)} />
         ),
       },
       {

@@ -964,6 +964,11 @@ sl-generic-modal.SpicyLyricsModal .sl-modal-overlay {
     }
   }
 
+  .sl-sp-btn[aria-pressed="true"] {
+    background: color-mix(in srgb, var(--spice-button-active, #7357ff) 72%, white) !important;
+    color: white !important;
+  }
+
   .sl-sp-visibility-btn {
     width: 30px;
     height: 30px;

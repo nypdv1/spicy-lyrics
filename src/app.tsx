@@ -35,6 +35,7 @@ import {
   $currentLyricsData,
   $customFont,
   $customFontEnabled,
+  $customFontSource,
   $disabledLyricsSources,
   $enableExperimentalWordSync,
   $escapeKeyFunction,
@@ -128,9 +129,9 @@ function bindDefault<T>(store: { get: () => T; listen: (listener: (value: T) => 
   store.listen(assign);
 }
 
-function applyCustomFont(enabled = $customFontEnabled.get(), font = $customFont.get()) {
+function applyCustomFont(enabled = $customFontEnabled.get(), font = $customFont.get(), source = $customFontSource.get()) {
   const cssFontFamily = toCssFontFamily(font);
-  loadCoollabsFont(enabled ? font : "");
+  loadCoollabsFont(enabled && source === "google" ? font : "");
   if (enabled && cssFontFamily) {
     document.documentElement.style.setProperty("--spicy-custom-font", cssFontFamily);
   } else {
@@ -185,12 +186,13 @@ function bindForkDefaults() {
   bindDefault($buildChannel, (value) => { Defaults.BuildChannel = value; });
   bindDefault($customFontEnabled, (value) => {
     Defaults.CustomFontEnabled = value;
-    applyCustomFont(value, $customFont.get());
+    applyCustomFont(value, $customFont.get(), $customFontSource.get());
   });
   bindDefault($customFont, (value) => {
     Defaults.CustomFont = value;
-    applyCustomFont($customFontEnabled.get(), value);
+    applyCustomFont($customFontEnabled.get(), value, $customFontSource.get());
   });
+  bindDefault($customFontSource, (value) => applyCustomFont($customFontEnabled.get(), $customFont.get(), value));
   bindDefault($alwaysShowInFullscreen, (value) => {
     Defaults.AlwaysShowInFullscreen = value;
     RefreshFullscreenControlsVisibility();

@@ -7,6 +7,7 @@ import {
   $animationFpsCapEnabled,
   $customFont,
   $customFontEnabled,
+  $customFontSource,
   $showNpvDynamicBg,
   $staticBackgroundBlur,
   $staticBackgroundMode,
@@ -42,6 +43,7 @@ interface Props {
 export default function AppearanceSection({ query, sectionFilter, showHidden = false }: Props) {
   const customFontEnabled = useStore($customFontEnabled);
   const customFont = useStore($customFont);
+  const customFontSource = useStore($customFontSource);
   const staticBackgroundMode = useStore($staticBackgroundMode);
   const canvasStageEnabled = useStore($experiment("canvasImmersive"));
   const staticBackgroundBlur = useStore($staticBackgroundBlur);
@@ -57,7 +59,7 @@ export default function AppearanceSection({ query, sectionFilter, showHidden = f
 
   const visible = (id: string) => showHidden ? hiddenSettingIds.includes(id) : !allowHidingSettings || !hiddenSettingIds.includes(id) || Boolean(query.trim());
   const r1 = visible("appearance-custom-font") && matches(query, "Use Custom Font", "Use a custom font instead of the bundled Spicy Lyrics font.");
-  const r2 = visible("appearance-custom-font") && customFontEnabled && matches(query, "Google Font", "Choose a Google Font or enter an installed font family name for lyrics.");
+  const r2 = visible("appearance-custom-font") && customFontEnabled && matches(query, "Font Picker", "Choose a Google Font or enter an installed system font family name for lyrics.");
   const r3 = visible("appearance-background-type") && matches(query, "Background Type", "Choose the dynamic, legacy, static image, or color background.");
   const r4 = visible("appearance-npv-background") && matches(query, "Display Dynamic Background in Now Playing View", "Show the animated background in the Now Playing panel.");
   const blurApplies = ["auto", "artistHeader", "coverArt"].includes(staticBackgroundMode);
@@ -141,8 +143,8 @@ export default function AppearanceSection({ query, sectionFilter, showHidden = f
       )}
 
       {r2 && (
-        <Row label="Google Font" description="Select a suggestion or enter any Google Font family. It loads through coolLabs Fonts; installed font names still work too.">
-          <GoogleFontPicker className="sl-sp-text-input" label="Google Font" value={customFont} onChange={(value) => $customFont.set(value)} />
+        <Row label="Font Picker" description="Choose a Google Font, loaded through coolLabs Fonts, or switch to System Font and enter any installed family.">
+          <GoogleFontPicker className="sl-sp-text-input" label="Font Picker" source={customFontSource} value={customFont} onSourceChange={(source) => $customFontSource.set(source)} onChange={(value) => $customFont.set(value)} />
         </Row>
       )}
 

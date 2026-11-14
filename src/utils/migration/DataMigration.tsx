@@ -20,6 +20,7 @@ const OLD_SETTINGS_KEYS = [
   "buildChannel",
   "customFontEnabled",
   "customFont",
+  "customFontSource",
   "alwaysShowInFullscreen",
   "showVolumeSliderFullscreen",
   "releaseYearPosition",

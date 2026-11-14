@@ -311,6 +311,9 @@ export const $pinnedFooterMode = persistAtom<PinnedFooterMode>(
 );
 export const $customFontEnabled = persistAtom<boolean>("customFontEnabled", false);
 export const $customFont = persistAtom<string>("customFont", "");
+export type CustomFontSource = "google" | "system";
+// Existing custom-font values were installed/system fonts, so preserve that behavior by default.
+export const $customFontSource = persistAtom<CustomFontSource>("customFontSource", "system");
 export const $alwaysShowInFullscreen = persistAtom<string>("alwaysShowInFullscreen", "None");
 export const $showVolumeSliderFullscreen = persistAtom<string>("showVolumeSliderFullscreen", "Off");
 export const $releaseYearPosition = persistAtom<string>("releaseYearPosition", "Off");

@@ -82,6 +82,9 @@ export interface SyllableLead {
     EndTime: number;
   };
   FlameOffset?: number;
+  // Vocal stutters render one word but replay it over these source timings.
+  RestartRanges?: Array<{ StartTime: number; EndTime: number }>;
+  RestartRangeStart?: number;
 }
 
 export interface LyricsSyllable {

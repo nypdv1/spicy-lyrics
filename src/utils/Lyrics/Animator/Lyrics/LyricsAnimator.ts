@@ -1691,8 +1691,15 @@ export function Animate(position: number): void {
         let floatCap = 1;
         for (let wordIndex = 0; wordIndex < words.length; wordIndex++) {
           const word = words[wordIndex];
-          const wordState = getElementState(ProcessedPosition, word.StartTime, word.EndTime);
-          const percentage = getProgressPercentage(ProcessedPosition, word.StartTime, word.EndTime);
+          // Repaired vocal stutters are one displayed word with multiple cues.
+          // Use the active cue so its animation restarts for every repetition.
+          const restartRange = word.RestartRanges?.find((range) =>
+            ProcessedPosition >= range.StartTime && ProcessedPosition <= range.EndTime
+          );
+          const timingStart = restartRange?.StartTime ?? word.StartTime;
+          const timingEnd = restartRange?.EndTime ?? word.EndTime;
+          const wordState = getElementState(ProcessedPosition, timingStart, timingEnd);
+          const percentage = getProgressPercentage(ProcessedPosition, timingStart, timingEnd);
           const sweepSpan = sweep?.Spans[wordIndex];
 
           const isLetterGroup = word?.LetterGroup;
@@ -1715,6 +1722,17 @@ export function Animate(position: number): void {
             let targetYOffset: number;
             let targetGlow: number;
             let targetGradientPos: number;
+
+            // Spring values otherwise carry over from the preceding vocal
+            // fragment. Reset at each stutter cue before feeding its new
+            // progress, making the same visible word genuinely replay.
+            if (restartRange && word.RestartRangeStart !== timingStart) {
+              word.RestartRangeStart = timingStart;
+              word.AnimatorStore.Scale.SetGoal(ScaleSpline.at(0), true);
+              word.AnimatorStore.YOffset.SetGoal(YOffsetSpline.at(0), true);
+              word.AnimatorStore.Glow.SetGoal(GlowSpline.at(0), true);
+              word.HTMLElement.style.setProperty("--gradient-position", "-20%");
+            }
 
             if (wordState === "Active") {
               targetScale = ScaleSpline.at(percentage);

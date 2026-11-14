@@ -72,6 +72,8 @@ interface SyllableData {
   IsPartOfWord?: boolean;
   // Continues visually, but starts a fresh word-timing animation after this part.
   RestartStutterAfter?: boolean;
+  // One displayed word can replay through several originally separate timings.
+  RestartRanges?: Array<{ StartTime: number; EndTime: number }>;
   TransliteratedIsPartOfWord?: boolean;
   // A word joined from syllables keeps them here.
   Parts?: SyllableData[];
@@ -205,7 +207,34 @@ function repairVocalStutters(syllables: SyllableData[]): SyllableData[] {
     for (let separator = index + 1; separator < targetIndex; separator++) repaired[separator].IsPartOfWord = true;
     if (nextText !== target.Text) target.Text = nextText;
   }
-  return repaired;
+  return collapseVocalStutters(repaired);
+}
+
+// `te-`, `te-`, `test` should render once as `test`.  Preserve every original
+// time range, though: the animator uses them to replay that one word at each
+// vocal restart instead of showing three independently animated fragments.
+function collapseVocalStutters(syllables: SyllableData[]): SyllableData[] {
+  const collapsed: SyllableData[] = [];
+  for (let index = 0; index < syllables.length; index++) {
+    if (!syllables[index].RestartStutterAfter) {
+      collapsed.push(syllables[index]);
+      continue;
+    }
+
+    const first = index;
+    while (index < syllables.length - 1 && syllables[index].RestartStutterAfter) index++;
+    const last = Math.min(index + 1, syllables.length - 1);
+    const run = syllables.slice(first, last + 1);
+    const final = run[run.length - 1];
+    collapsed.push({
+      ...final,
+      StartTime: run[0].StartTime,
+      EndTime: final.EndTime,
+      RestartRanges: run.map(({ StartTime, EndTime }) => ({ StartTime, EndTime })),
+    });
+    index = last;
+  }
+  return collapsed;
 }
 
 // A syllable's letters when it's held long enough to be drawn letter by letter, else null.
@@ -248,7 +277,9 @@ function planWords(
   const texts = parts.map((part) => StripZeroWidth(getSyllableText(part, useRomanized)));
   const durations = parts.map((part) => ConvertTime(part.EndTime) - ConvertTime(part.StartTime));
   const lettersOf = (i: number, duration: number) =>
-    allowLetters && duration >= MinLetterCapableDuration() ? SplitLetters(texts[i]) : [];
+    allowLetters && !parts[i].RestartRanges && duration >= MinLetterCapableDuration()
+      ? SplitLetters(texts[i])
+      : [];
   const plans: WordPlan[] = [];
   for (let i = 0; i < parts.length; i++) {
     let end = i;
@@ -682,7 +713,7 @@ export function ApplySyllableLyrics(
 
       if (plan.Split) {
         word = document.createElement("div");
-        Emphasize(letters, word, lead, false, pacedParts(lead, ShowRomanized, letters.length), plan.Group);
+        Emphasize(letters, word, lead, false, pacedParts(lead, ShowRomanized, letters.length), plan.Group, lead.RestartRanges);
         tagWordLetters(plan.WordLetters);
 
         if (isLastInLine) {
@@ -722,6 +753,10 @@ export function ApplySyllableLyrics(
             StartTime: ConvertTime(lead.StartTime),
             EndTime: ConvertTime(lead.EndTime),
             TotalTime: totalDuration,
+            ...(lead.RestartRanges ? { RestartRanges: lead.RestartRanges.map((range) => ({
+              StartTime: ConvertTime(range.StartTime),
+              EndTime: ConvertTime(range.EndTime),
+            })) } : {}),
           });
           tagWordLetters(plan.WordLetters);
         } else {
@@ -801,7 +836,7 @@ export function ApplySyllableLyrics(
 
           if (plan.Split) {
             bwE = document.createElement("div");
-            Emphasize(plan.Letters, bwE, bw, true, pacedParts(bw, ShowRomanized, plan.Letters.length), plan.Group);
+            Emphasize(plan.Letters, bwE, bw, true, pacedParts(bw, ShowRomanized, plan.Letters.length), plan.Group, bw.RestartRanges);
             tagWordLetters(plan.WordLetters);
 
             if (isLastInLine) {
@@ -834,6 +869,10 @@ export function ApplySyllableLyrics(
                 StartTime: ConvertTime(bw.StartTime),
                 EndTime: ConvertTime(bw.EndTime),
                 TotalTime: ConvertTime(bw.EndTime) - ConvertTime(bw.StartTime),
+                ...(bw.RestartRanges ? { RestartRanges: bw.RestartRanges.map((range) => ({
+                  StartTime: ConvertTime(range.StartTime),
+                  EndTime: ConvertTime(range.EndTime),
+                })) } : {}),
                 BGWord: true,
               });
               tagWordLetters(plan.WordLetters);

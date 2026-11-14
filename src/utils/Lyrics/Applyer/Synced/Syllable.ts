@@ -303,12 +303,14 @@ function collapseVocalStutters(
     }
     const display = syllables.slice(lastMatch.displayStart, lastMatch.displayEnd + 1);
     const final = display[display.length - 1];
+    const stripDisplayStutterDashes = (text: string) =>
+      text.replace(/^\s*[-\u2010-\u2015]\s*/u, "").replace(/[-\u2010-\u2015]\s*$/u, "");
     const joinPhraseText = (pick: (part: SyllableData) => string) =>
-      display.reduce(
+      stripDisplayStutterDashes(display.reduce(
         (joined, part, partIndex) =>
           `${joined}${partIndex > 0 && !display[partIndex - 1].IsPartOfWord ? " " : ""}${pick(part).replace(/[-\u2010-\u2015]\s*$/u, "")}`,
         ""
-      );
+      ));
     const text = joinPhraseText((part) => part.Text ?? "");
     const phraseRanges = [
       { start: group[0].prefixStart, end: group[0].prefixEnd },

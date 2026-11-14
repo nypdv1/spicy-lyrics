@@ -1697,6 +1697,11 @@ export function Animate(position: number): void {
 
           const isLetterGroup = word?.LetterGroup;
           const isDot = word?.Dot;
+          // TTML providers can time a normal word span without making it eligible
+          // for letter splitting.  Keep that markup intact (so its gradient wipe
+          // remains continuous), but let the user-selected threshold still give
+          // the span the held-word emphasis.
+          const hasLongWordEffect = !isLetterGroup && word.TotalTime >= $longWordThreshold.get();
 
           if (!isDot) {
             if (!word.AnimatorStore) {
@@ -1737,6 +1742,17 @@ export function Animate(position: number): void {
               targetYOffset = YOffsetSpline.at(1);
               targetGlow = GlowSpline.at(1);
               targetGradientPos = 100;
+            }
+
+            if (hasLongWordEffect) {
+              // Use the held-word curve on the unsplit word itself.  This is
+              // deliberately independent from IsLetterCapable: lowering the
+              // slider must not turn short TTML spans into per-letter elements
+              // and break their smooth wipe.
+              const heldScale = LetterScaleSpline.at(percentage);
+              const heldYOffset = LetterYOffsetSpline.at(percentage);
+              targetScale += heldScale - ScaleSpline.at(percentage);
+              targetYOffset += heldYOffset - YOffsetSpline.at(percentage);
             }
 
             if (refreshedSimple) {
@@ -1855,13 +1871,13 @@ export function Animate(position: number): void {
               setStyleIfChanged(
                 word.HTMLElement,
                 "--text-shadow-blur-radius",
-                `${4 + 2 * currentGlow * 1}px`,
+                `${4 + (hasLongWordEffect ? 8 : 2) * currentGlow}px`,
                 0.5
               );
               setStyleIfChanged(
                 word.HTMLElement,
                 "--text-shadow-opacity",
-                `${Math.min(currentGlow * 35, 100)}%`,
+                `${Math.min(currentGlow * (hasLongWordEffect ? 80 : 35), 100)}%`,
                 1
               );
             }

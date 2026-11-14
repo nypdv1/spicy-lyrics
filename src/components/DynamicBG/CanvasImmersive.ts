@@ -303,12 +303,19 @@ function MountOnPage(page: HTMLElement) {
   resizeObserver.observe(nowBar);
 
   // The page's classes change all the time (our own toggle included); only a change in
-  // whether the theme owns the background is worth a refresh.
+  // whether the theme owns the background or a live music video starts/stops is worth a refresh.
   let themeOwned = themeOwnsBackground(page);
+  let videoActive = page.classList.contains("st-mv-active");
   const themeObserver = new MutationObserver(() => {
     // The side swap moves the stage; the music video follows it.
     if (mount && musicVideoStaged) placeMusicVideo(mount);
     recoverMissingMusicVideo(page);
+    const nextVideoActive = page.classList.contains("st-mv-active");
+    if (nextVideoActive !== videoActive) {
+      videoActive = nextVideoActive;
+      void Refresh();
+      return;
+    }
     const owned = themeOwnsBackground(page);
     if (owned === themeOwned) return;
     themeOwned = owned;
@@ -677,6 +684,9 @@ function syncMusicVideoStage(m: Mount): boolean {
   const videoActive = m.page.classList.contains("st-mv-active");
   if (videoActive) {
     clearMusicVideoReleaseTimer();
+    // A canvas or motion request may be awaiting media while the video begins.
+    // Invalidate that request before it can attach over the video stage.
+    if (!musicVideoStaged) generation++;
   } else if (musicVideoStaged && eligible && !musicVideoReleaseTimer) {
     musicVideoReleaseTimer = setTimeout(() => {
       musicVideoReleaseTimer = null;

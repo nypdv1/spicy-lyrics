@@ -1,4 +1,5 @@
 const LINK_ID = "spicy-lyrics-google-font";
+const PREVIEW_LINK_ID = "spicy-lyrics-google-font-preview";
 const CSS_ENDPOINT = "https://api.fonts.coollabs.io/css2";
 
 /** Loads the selected Google Font through coolLabs' privacy-friendly CSS API. */
@@ -18,4 +19,19 @@ export function loadCoollabsFont(fontFamily: string, targetDocument: Document = 
   // one weight, while CSS can safely synthesize the extra lyric weights if needed.
   link.href = `${CSS_ENDPOINT}?family=${encodeURIComponent(family.replace(/\s+/g, "+"))}&display=swap`;
   if (!existing) targetDocument.head.append(link);
+}
+
+/** Loads a temporary family set for the font-picker specimens. */
+export function loadCoollabsFontPreviews(fontFamilies: readonly string[], targetDocument: Document = document): () => void {
+  const existing = targetDocument.getElementById(PREVIEW_LINK_ID) as HTMLLinkElement | null;
+  existing?.remove();
+  const families = [...new Set(fontFamilies.map((font) => font.trim()).filter(Boolean))];
+  if (!families.length) return () => {};
+  const link = targetDocument.createElement("link");
+  link.id = PREVIEW_LINK_ID;
+  link.rel = "stylesheet";
+  link.type = "text/css";
+  link.href = `${CSS_ENDPOINT}?${families.map((family) => `family=${encodeURIComponent(family.replace(/\s+/g, "+"))}`).join("&")}&display=swap`;
+  targetDocument.head.append(link);
+  return () => link.remove();
 }

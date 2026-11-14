@@ -1,5 +1,6 @@
 import { PopupModal } from "../components/Modal.ts";
 import { GOOGLE_FONT_OPTIONS } from "./googleFonts.ts";
+import { loadCoollabsFontPreviews } from "./coollabsFonts.ts";
 
 const SYSTEM_FONT_FALLBACK = ["Arial", "Calibri", "Cambria", "Cascadia Mono", "Courier New", "Georgia", "Segoe UI", "Tahoma", "Times New Roman", "Trebuchet MS", "Verdana"];
 
@@ -25,9 +26,13 @@ export function openFontPicker(source: "google" | "system", selected: string, on
   const list = document.createElement("div");
   list.className = "sl-font-picker-list";
   root.append(search, list);
-  PopupModal.display({ title: source === "google" ? "Choose a Google Font" : "Choose a System Font", content: root, modalId: "fontPicker", isLarge: true });
+  let closed = false;
+  let removePreviews = () => {};
+  PopupModal.display({ title: source === "google" ? "Choose a Google Font" : "Choose a System Font", content: root, modalId: "fontPicker", isLarge: true, onClose: () => { closed = true; removePreviews(); } });
 
   void fontsFor(source).then((fonts) => {
+    if (closed) return;
+    if (source === "google") removePreviews = loadCoollabsFontPreviews(fonts);
     const render = () => {
       const query = search.value.trim().toLowerCase();
       const matches = fonts.filter((font) => !query || font.toLowerCase().includes(query));

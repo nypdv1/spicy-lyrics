@@ -150,11 +150,18 @@ function repairVocalStutters(syllables: SyllableData[]): SyllableData[] {
     const currentText = current.Text ?? "";
     let targetIndex = index + 1;
     let prefixText = currentText;
+    let movesDashToCurrent = false;
     // Some providers time an em dash as its own word. Treat that punctuation
     // as the separator between two repeated starts as well.
     if (!dashAtEnd.test(prefixText) && dashOnly.test(repaired[targetIndex]?.Text ?? "")) {
       targetIndex++;
       prefixText = `${prefixText}-`;
+    // Other providers put the dash at the start of the following timed word
+    // (`Te`, `— test`). Move it to the preceding fragment after checking the
+    // repeat, so the final display remains `Te-test` with no extra space.
+    } else if (!dashAtEnd.test(prefixText) && dashAtStart.test(repaired[targetIndex]?.Text ?? "")) {
+      prefixText = `${prefixText.trimEnd()}-`;
+      movesDashToCurrent = true;
     }
     if (!dashAtEnd.test(prefixText)) continue;
     const target = repaired[targetIndex];
@@ -164,6 +171,7 @@ function repairVocalStutters(syllables: SyllableData[]): SyllableData[] {
     // Only repair repeated starts (te- test), never an ordinary hyphenated
     // compound such as "well- known".
     if (!prefix || !lettersOnly(nextText).startsWith(prefix)) continue;
+    if (movesDashToCurrent) current.Text = prefixText;
     current.IsPartOfWord = true;
     for (let separator = index + 1; separator < targetIndex; separator++) repaired[separator].IsPartOfWord = true;
     if (nextText !== target.Text) target.Text = nextText;

@@ -1369,6 +1369,48 @@ function getProgressPercentage(currentTime: number, startTime: number, endTime: 
   return (currentTime - startTime) / (endTime - startTime);
 }
 
+type WordTiming = {
+  StartTime: number;
+  EndTime: number;
+  State: "NotSung" | "Active" | "Sung";
+  Progress: number;
+  Restart: boolean;
+};
+
+// A vocal stutter has one visible word, but several independent playback
+// windows. Outside one of those windows it is either waiting or already sung;
+// it must never interpolate across the outer first-to-last source span.
+function getWordTiming(word: SyllableLead, position: number): WordTiming {
+  const ranges = word.RestartRanges;
+  if (!ranges?.length) {
+    return {
+      StartTime: word.StartTime,
+      EndTime: word.EndTime,
+      State: getElementState(position, word.StartTime, word.EndTime),
+      Progress: getProgressPercentage(position, word.StartTime, word.EndTime),
+      Restart: false,
+    };
+  }
+  const active = ranges.find((range) => position >= range.StartTime && position <= range.EndTime);
+  if (active) {
+    return {
+      StartTime: active.StartTime,
+      EndTime: active.EndTime,
+      State: getElementState(position, active.StartTime, active.EndTime),
+      Progress: getProgressPercentage(position, active.StartTime, active.EndTime),
+      Restart: true,
+    };
+  }
+  const waiting = position < ranges[0].StartTime;
+  return {
+    StartTime: word.StartTime,
+    EndTime: word.EndTime,
+    State: waiting ? "NotSung" : "Sung",
+    Progress: waiting ? 0 : 1,
+    Restart: false,
+  };
+}
+
 function reconcileLineAnimation(line: LyricsSyllable | LyricsLine, position: number): void {
   const simple = simpleFamily();
   const active = position >= line.StartTime && position < line.EndTime;
@@ -1380,8 +1422,9 @@ function reconcileLineAnimation(line: LyricsSyllable | LyricsLine, position: num
   }
 
   for (const word of line.Syllables?.Lead ?? []) {
-    const wordProgress = getProgressPercentage(position, word.StartTime, word.EndTime);
-    const wordState = getElementState(position, word.StartTime, word.EndTime);
+    const timing = getWordTiming(word, position);
+    const wordProgress = timing.Progress;
+    const wordState = timing.State;
     const wordActive = wordState === "Active";
 
     if (word.Dot) {
@@ -1693,20 +1736,11 @@ export function Animate(position: number): void {
           const word = words[wordIndex];
           // Repaired vocal stutters are one displayed word with multiple cues.
           // Use the active cue so its animation restarts for every repetition.
-          const restartRange = word.RestartRanges?.find((range) =>
-            ProcessedPosition >= range.StartTime && ProcessedPosition <= range.EndTime
-          );
-          const hasRestartRanges = !!word.RestartRanges?.length;
-          const timingStart = restartRange?.StartTime ?? word.StartTime;
-          const timingEnd = restartRange?.EndTime ?? word.EndTime;
-          // Between stutter cues the displayed word has already completed;
-          // never fall back to its outer (first-to-last) duration there.
-          const wordState = restartRange || !hasRestartRanges
-            ? getElementState(ProcessedPosition, timingStart, timingEnd)
-            : ProcessedPosition < word.RestartRanges![0].StartTime ? "NotSung" : "Sung";
-          const percentage = restartRange || !hasRestartRanges
-            ? getProgressPercentage(ProcessedPosition, timingStart, timingEnd)
-            : wordState === "Sung" ? 1 : 0;
+          const timing = getWordTiming(word, ProcessedPosition);
+          const timingStart = timing.StartTime;
+          const timingEnd = timing.EndTime;
+          const wordState = timing.State;
+          const percentage = timing.Progress;
           const wordDuration = timingEnd - timingStart;
           const sweepSpan = sweep?.Spans[wordIndex];
 
@@ -1734,7 +1768,7 @@ export function Animate(position: number): void {
             // Spring values otherwise carry over from the preceding vocal
             // fragment. Reset at each stutter cue before feeding its new
             // progress, making the same visible word genuinely replay.
-            if (restartRange && word.RestartRangeStart !== timingStart) {
+            if (timing.Restart && word.RestartRangeStart !== timingStart) {
               word.RestartRangeStart = timingStart;
               word.AnimatorStore.Scale.SetGoal(ScaleSpline.at(0), true);
               word.AnimatorStore.YOffset.SetGoal(YOffsetSpline.at(0), true);

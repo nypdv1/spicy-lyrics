@@ -6,7 +6,9 @@ import {
   $escapeKeyFunction,
   $openProfilesInBrowser,
   $hideNpvLyricsWhenUnavailable,
+  $hideNowBarInCinema,
   $lockedMediaBox,
+  $communityLyricsUseDisplayName,
   $motionArtwork,
   $motionArtworkOnStage,
   $motionArtworkPriority,
@@ -136,6 +138,13 @@ const groups: GroupDef[] = [
         Control: ({ label }) => <Select label={label} value={useStore($showVolumeSliderFullscreen)} options={["Off", "Left", "Right", "Below"]} onChange={(v) => $showVolumeSliderFullscreen.set(v)} />,
       },
       {
+        id: "hideNowBarInCinema",
+        label: "Hide NowBar in Cinema View",
+        description: "Hide the player while Cinema View is open. Fullscreen is unchanged.",
+        keywords: "cinema player nowbar hide",
+        Control: ({ label }) => <Toggle label={label} checked={useStore($hideNowBarInCinema)} onChange={(v) => $hideNowBarInCinema.set(v)} />,
+      },
+      {
         id: "animateFullscreenClose",
         label: "Animate Closing Fullscreen",
         description: "Slide the lyrics page away when closing fullscreen.",
@@ -246,6 +255,13 @@ const groups: GroupDef[] = [
   {
     title: "Windows and Buttons",
     settings: [
+      {
+        id: "communityLyricsUseDisplayName",
+        label: "Community Lyrics Display Names",
+        description: "Show profile display names instead of usernames in community lyric credits.",
+        keywords: "community lyrics credits profile username display name",
+        Control: ({ label }) => <Toggle label={label} checked={useStore($communityLyricsUseDisplayName)} onChange={(v) => $communityLyricsUseDisplayName.set(v)} />,
+      },
       {
         id: "openProfilesInBrowser",
         label: "Open Profiles in Browser",

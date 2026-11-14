@@ -42,6 +42,8 @@ export const SETTING_CATALOG = [
   ["interface-view-controls", "View Controls Position", "Where the view controls (play, scroll, etc.) appear.", "Interface"],
   ["interface-always-fullscreen", "Always Show In Fullscreen", "Keep fullscreen time or controls visible.", "Interface"],
   ["interface-fullscreen-volume", "Fullscreen Volume Slider", "Show a volume slider in fullscreen and Cinema View.", "Interface"],
+  ["interface-hide-nowbar-cinema", "Hide NowBar in Cinema View", "Hide the player while Cinema View is open.", "Interface"],
+  ["lyrics-community-display-names", "Community Lyrics Display Names", "Show profile display names instead of usernames in community lyric credits.", "Interface"],
   ["interface-release-year", "Release Year Position", "Show release year near track metadata.", "Interface"],
   ["interface-animate-close", "Animate closing fullscreen", "Slide the lyrics page away when closing fullscreen.", "Interface"],
   ["interface-escape-key", "Escape Key Function", "Choose how Escape behaves in lyrics fullscreen.", "Interface"],

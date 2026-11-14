@@ -7,7 +7,7 @@ import {
   showIframeProfileModal,
 } from "../../../../components/ReactComponents/IframeProfile/IframeProfileModal.tsx";
 import { GetLyricsFooterDetails, PinFooterDetailWithoutWriters } from "./CreateLyricsFooter.ts";
-import { $openProfilesInBrowser } from "../../../../utils/stores.ts";
+import { $communityLyricsUseDisplayName, $openProfilesInBrowser } from "../../../../utils/stores.ts";
 
 let isByCommunityAbortController: AbortController | null = null;
 let madeTippys = new Set<any>();
@@ -131,7 +131,9 @@ export function ApplyIsByCommunity(data: any, LyricsContainer: HTMLElement): voi
     if (cleanUsername && cleanDisplayName && cleanUsername.toLowerCase() === cleanDisplayName.toLowerCase()) {
       return cleanDisplayName;
     }
-    return cleanUsername ?? cleanDisplayName;
+    return $communityLyricsUseDisplayName.get()
+      ? cleanDisplayName ?? cleanUsername
+      : cleanUsername ?? cleanDisplayName;
   };
 
   const makerDisplayName = data.TTMLUploadMetadata?.Maker?.displayName ?? data.TTMLUploadMetadata?.Maker?.display_name ?? data.TTMLUploadMetadata?.Maker?.globalName ?? data.TTMLUploadMetadata?.Maker?.global_name;
@@ -162,7 +164,8 @@ export function ApplyIsByCommunity(data: any, LyricsContainer: HTMLElement): voi
     nameSpan.classList.add("SongInfoName");
     const usernameSpan = PageDocument.createElement("span");
     usernameSpan.textContent = username;
-    nameSpan.append("@", usernameSpan);
+    if (!$communityLyricsUseDisplayName.get()) nameSpan.append("@");
+    nameSpan.append(usernameSpan);
     profileSectionSpan.append(labelSpan, " ");
 
     if (avatarUrl) {

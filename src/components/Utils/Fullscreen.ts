@@ -1,7 +1,7 @@
 import { GetCurrentLyricsContainerInstance } from "../../utils/Lyrics/Applyer/CreateLyricsContainer.ts";
 import { SyncNoLyricsLayout } from "../../utils/Lyrics/LyricsNotice.ts";
 import { ResetLastLine } from "../../utils/Scrolling/ScrollToActiveLine.ts";
-import { $currentLyricsData, $showVolumeSliderFullscreen } from "../../utils/stores.ts";
+import { $currentLyricsData, $hideNowBarInCinema, $showVolumeSliderFullscreen } from "../../utils/stores.ts";
 import { $forceCompactMode, $isNowBarOpen } from "../../utils/uiState.ts";
 import Global from "../Global/Global.ts";
 import Defaults from "../Global/Defaults.ts";
@@ -91,6 +91,10 @@ function SyncFullscreenAlwaysShowClasses() {
     "AlwaysShowFullscreenTime",
     Fullscreen.IsOpen && shouldAlwaysShowFullscreenTime()
   );
+}
+
+function SyncCinemaNowBarClass() {
+  PageContainer?.classList.toggle("HideNowBarInCinema", $hideNowBarInCinema.get());
 }
 
 const Page_MouseMove = () => {
@@ -458,6 +462,7 @@ function Open(skipDocumentFullscreen: boolean = false, moveElement: boolean = tr
     // Handle DOM changes
     if (moveElement) TransferElement(SpicyPage, Root);
     SpicyPage.classList.add("Fullscreen");
+    SyncCinemaNowBarClass();
     SyncFullscreenAlwaysShowClasses();
 
     // Hide the main element
@@ -766,6 +771,10 @@ function RefreshFullscreenVolumeSlider() {
 
 $showVolumeSliderFullscreen.listen(() => {
   RefreshFullscreenVolumeSlider();
+});
+
+$hideNowBarInCinema.listen(() => {
+  SyncCinemaNowBarClass();
 });
 
 Global.Event.listen("compact-mode:enable", () => {

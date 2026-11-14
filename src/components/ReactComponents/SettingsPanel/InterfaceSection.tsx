@@ -6,6 +6,7 @@ import {
   $disableNpvLyrics,
   $escapeKeyFunction,
   $hideNpvLyricsWhenUnavailable,
+  $hideNowBarInCinema,
   $hiddenSettingIds,
   $lockedMediaBox,
   $openProfilesInBrowser,
@@ -15,6 +16,7 @@ import {
   $removeSpotifyLyricsButton,
   $viewControlsPosition,
   $showNoLyricsNotice,
+  $communityLyricsUseDisplayName,
 } from "../../../utils/stores.ts";
 import { $experiment, getExperiment } from "../../../utils/experiments.ts";
 import { $isGlobalNav } from "../../../utils/uiState.ts";
@@ -46,6 +48,8 @@ export default function InterfaceSection({ query, sectionFilter, showHidden = fa
   const disableNpvLyrics = useStore($disableNpvLyrics);
   const removeSpotifyLyricsButton = useStore($removeSpotifyLyricsButton);
   const showNoLyricsNotice = useStore($showNoLyricsNotice);
+  const hideNowBarInCinema = useStore($hideNowBarInCinema);
+  const communityLyricsUseDisplayName = useStore($communityLyricsUseDisplayName);
   const isGlobalNav = useStore($isGlobalNav);
   const hiddenSettingIds = useStore($hiddenSettingIds);
   const motionArtwork = useStore($motionArtwork);
@@ -70,6 +74,8 @@ export default function InterfaceSection({ query, sectionFilter, showHidden = fa
   const motion = shown("interface-motion-artwork", "Motion Artwork", "Play the album's animated cover over the still one.");
   const motionPriority = shown("interface-motion-artwork-priority", "Motion Artwork or Canvas", "Which one plays when a song has both.");
   const motionStage = shown("interface-motion-artwork-stage", "Motion Artwork on Canvas Stage", "Let motion artwork fill the Canvas Stage.");
+  const cinemaNowBar = shown("interface-hide-nowbar-cinema", "Hide NowBar in Cinema View", "Hide the player while Cinema View is open.");
+  const communityNames = shown("lyrics-community-display-names", "Community Lyrics Display Names", "Show profile display names instead of usernames in community lyric credits.");
   // The two stage rows only matter with Motion Artwork on and Canvas Stage enabled.
   const stageRowsDisabledReason = !motionArtwork
     ? "Turn on Motion Artwork to change this."
@@ -78,7 +84,7 @@ export default function InterfaceSection({ query, sectionFilter, showHidden = fa
       : stageBackgroundNote
         ? `Only applies with the Default background; Background Type is ${backgroundModeLabel(backgroundMode)}.`
         : undefined;
-  if (!rows.some(Boolean) && !notice && !motion && !motionPriority && !motionStage && !movingNowBar) return null;
+  if (!rows.some(Boolean) && !notice && !motion && !motionPriority && !motionStage && !movingNowBar && !cinemaNowBar && !communityNames) return null;
   const normalizedAlwaysShow = alwaysShowInFullscreen === "All" ? "Both" : alwaysShowInFullscreen;
 
   return <>
@@ -89,6 +95,7 @@ export default function InterfaceSection({ query, sectionFilter, showHidden = fa
     {rows[2] && <Row settingId="interface-view-controls" label="View Controls Position" description="Where the view controls (play, scroll, etc.) appear." disabled={!isGlobalNav} disabledReason="Only available in Spotify's new navigation layout"><Select value={viewControlsPosition} options={vcPositionOptions} onChange={(v) => $viewControlsPosition.set(v)} /></Row>}
     {rows[3] && <Row settingId="interface-always-fullscreen" label="Always Show In Fullscreen" description="Keep fullscreen time or controls visible."><Select value={normalizedAlwaysShow} options={fullscreenOptions} onChange={(v) => $alwaysShowInFullscreen.set(v)} /></Row>}
     {rows[4] && <Row settingId="interface-fullscreen-volume" label="Fullscreen Volume Slider" description="Show a volume slider in fullscreen and Cinema View."><Select value={showVolumeSliderFullscreen} options={volumeOptions} onChange={(v) => $showVolumeSliderFullscreen.set(v)} /></Row>}
+    {cinemaNowBar && <Row settingId="interface-hide-nowbar-cinema" label="Hide NowBar in Cinema View" description="Hide the player while Cinema View is open. Fullscreen and the normal lyrics view are unchanged."><Toggle checked={hideNowBarInCinema} onChange={(v) => $hideNowBarInCinema.set(v)} /></Row>}
     {rows[5] && <Row settingId="interface-release-year" label="Release Year Position" description="Show release year near track metadata."><Select value={releaseYearPosition} options={releaseYearOptions} onChange={(v) => $releaseYearPosition.set(v)} /></Row>}
     {movingNowBar && <Row settingId="interface-nowbar-moving-artwork" label="NowBar for Canvas and Motion Artwork" description="With the NowBar turned off, bring it in for songs that have a Canvas or motion artwork, and let it go again for songs that don't. The NowBar button hides it for the current song." note={nowBarForMovingArtwork && (!canvasStage || stageBackgroundNote) && `Songs with only a Canvas won't bring it in: Canvas plays with ${getExperiment("canvasImmersive").label} on and the Default background. Motion artwork still does.`}><Toggle checked={nowBarForMovingArtwork} onChange={(v) => $nowBarForMovingArtwork.set(v)} /></Row>}
     {motion && <Row settingId="interface-motion-artwork" label="Motion Artwork" description="Play the album's animated cover over the still one in the NowBar, for albums that have one."><Toggle checked={motionArtwork} onChange={(v) => $motionArtwork.set(v)} /></Row>}
@@ -99,6 +106,7 @@ export default function InterfaceSection({ query, sectionFilter, showHidden = fa
     {rows[8] && <Row settingId="interface-disable-npv" label="Disable NPV Lyrics" description="Never show the lyrics card in the Now Playing sidebar."><Toggle checked={disableNpvLyrics} onChange={(v) => $disableNpvLyrics.set(v)} /></Row>}
     {rows[9] && <Row settingId="interface-hide-empty-npv" label="Hide NPV Lyrics When No Lyrics Are Available" description="Remove the lyrics card when the current song has no lyrics." disabled={disableNpvLyrics} disabledReason="The NPV lyrics card is disabled"><Toggle checked={hideNpvLyricsWhenUnavailable} onChange={(v) => $hideNpvLyricsWhenUnavailable.set(v)} /></Row>}
     {rows[10] && <Row settingId="interface-open-profiles-browser" label="Open Profiles in Browser" description="Open contributor profiles in your browser instead of inside Spotify."><Toggle checked={openProfilesInBrowser} onChange={(v) => $openProfilesInBrowser.set(v)} /></Row>}
+    {communityNames && <Row settingId="lyrics-community-display-names" label="Community Lyrics Display Names" description="Show profile display names instead of usernames in community lyric credits."><Toggle checked={communityLyricsUseDisplayName} onChange={(v) => $communityLyricsUseDisplayName.set(v)} /></Row>}
     {rows[11] && <Row settingId="interface-remove-spotify-lyrics" label="Remove Spotify's Lyrics Button" description="Hide Spotify's built-in lyrics button. The Spicy Lyrics buttons stay visible."><Toggle checked={removeSpotifyLyricsButton} onChange={(v) => $removeSpotifyLyricsButton.set(v)} /></Row>}
   </>;
 }

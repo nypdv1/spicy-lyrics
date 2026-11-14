@@ -3336,3 +3336,7 @@
   align-items: center;
   justify-content: center;
 }
+/* Cinema View stays in the normal document; actual fullscreen must keep its player. */
+:root:not(:fullscreen) #SpicyLyricsPage.Fullscreen.HideNowBarInCinema .ContentBox > .NowBar {
+  display: none !important;
+}

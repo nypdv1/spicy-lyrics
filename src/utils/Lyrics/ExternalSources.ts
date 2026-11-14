@@ -1,4 +1,3 @@
-import Defaults from "../../components/Global/Defaults.ts";
 import type { LyricsSourceProviderId } from "./LyricsSourcePreferences.ts";
 import type { ExternalLyricsResult } from "./Sources/Types.ts";
 import { getTrackLyricsInfo } from "./Sources/Track.ts";
@@ -20,7 +19,7 @@ export { refreshMusixmatchToken } from "./Sources/Musixmatch.ts";
  * not line pauses, and are also ignored. Only gaps strictly within the window
  * [minGapSec, maxGapSec) are counted as real Apple Music line-ending data.
  */
-function hasLineGaps(lyrics: any, minGapSec = 0.3, maxGapSec = 5.0): boolean {
+function _hasLineGaps(lyrics: any, minGapSec = 0.3, maxGapSec = 5.0): boolean {
   const content = Array.isArray(lyrics?.Content) ? lyrics.Content : [];
   if (content.length < 2) return false;
 
@@ -100,8 +99,6 @@ export async function fetchLyricsFromProviders(
     return null;
   }
 
-  const prioritizeApple = Defaults.PrioritizeAppleMusicQuality;
-  const appleIsInOrder = order.includes("apple");
   let spicyRawPromise: Promise<ExternalLyricsResult | null> | null = null;
   const getSpicyRaw = () => {
     spicyRawPromise ??= fetchSpicyLyricsRaw(trackInfo.id);
@@ -145,9 +142,6 @@ export async function fetchLyricsFromProviders(
   let queuedResult: ExternalLyricsResult | null = null;
   let bestScore = 0;
   let hadPreferredResult = false;
-  let appleResult: ExternalLyricsResult | null = null;
-  let appleScore = 0;
-  let appleTried = false;
 
   for (const provider of order) {
     // If a preferred source (spicy/musixmatch) already gave us something,
@@ -158,20 +152,14 @@ export async function fetchLyricsFromProviders(
 
     const result = await (providerRequests.get(provider) ?? Promise.resolve(null));
 
-    if (provider === "apple") {
-      appleTried = true;
-      if (result?.lyrics) {
-        appleResult = result;
-        appleScore = getLyricsTypeScore(result.lyrics);
-      }
-    }
-
     if (result?.status === 503) queuedResult = result;
     if (!result?.lyrics) {
       continue;
     }
 
     const score = getLyricsTypeScore(result.lyrics);
+    // Equal timing keeps the result from the earlier (higher-priority) source.
+    // A later source can only upgrade the selection with a strictly better tier.
     if (score > bestScore) {
       bestResult = result;
       bestScore = score;
@@ -182,24 +170,7 @@ export async function fetchLyricsFromProviders(
     }
 
     if (score >= 3) {
-      // When prioritizing Apple Music quality, don't early-exit until apple has been tried.
-      if (prioritizeApple && appleIsInOrder && !appleTried) {
-        continue;
-      }
-      // Prefer Apple Music if it scored strictly higher, or tied and has real line-ending gaps.
-      if (prioritizeApple && appleResult) {
-        if (appleScore > score || (appleScore === score && hasLineGaps(appleResult.lyrics))) {
-          return appleResult;
-        }
-      }
       return result;
-    }
-  }
-
-  // Final tiebreak: prefer Apple Music if it scored strictly higher, or tied and has real gaps.
-  if (prioritizeApple && appleResult) {
-    if (appleScore > bestScore || (appleScore === bestScore && hasLineGaps(appleResult.lyrics))) {
-      return appleResult;
     }
   }
 

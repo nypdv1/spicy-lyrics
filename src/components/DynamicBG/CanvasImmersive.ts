@@ -392,6 +392,18 @@ function releaseLayer(layer: Layer) {
   delete layer.box.dataset.source;
 }
 
+// Spicy Themes treats every <video> under the lyrics page as a possible music
+// video, even an unloaded one.  Do not leave our two reusable Canvas slots in
+// its scan while it owns the stage; put the same elements back only when Canvas
+// or motion artwork needs one again.
+function detachCanvasLayerVideos(m: Mount): void {
+  for (const layer of m.layers) layer.video.remove();
+}
+
+function ensureCanvasLayerVideo(layer: Layer): void {
+  if (layer.video.parentElement !== layer.box) layer.box.append(layer.video);
+}
+
 function clearSuspendTimer() {
   if (suspendTimer) clearTimeout(suspendTimer);
   suspendTimer = null;
@@ -865,6 +877,7 @@ function syncMusicVideoStage(m: Mount): boolean {
       // the DOM for its fade: that makes it tear down its own player for this track.
       if (active) deactivate(true);
       else for (const layer of m.layers) releaseLayer(layer);
+      detachCanvasLayerVideos(m);
       m.page.classList.add(MUSIC_VIDEO_CLASS);
       toggleDockLayout(m, true);
       traceMusicVideo("stage claimed", m.page);
@@ -983,6 +996,7 @@ async function Refresh(isRetry = false) {
   if (reserveStageForMusicVideo(mount.page)) {
     if (active) deactivate(true);
     else for (const layer of mount.layers) releaseLayer(layer);
+    detachCanvasLayerVideos(mount);
     notifyCoverClaim();
     return;
   }
@@ -1027,6 +1041,7 @@ async function Refresh(isRetry = false) {
     retryFileId = null;
     if (failedFileId === media.fileId) failedFileId = null;
     releaseLayer(next);
+    ensureCanvasLayerVideo(next);
     try {
       detach = await AttachCanvasMedia(next.video, media);
     } catch (err) {
@@ -1044,6 +1059,7 @@ async function Refresh(isRetry = false) {
     }
   } else {
     releaseLayer(next);
+    ensureCanvasLayerVideo(next);
     detach = await attachMotion(next.video, source.upc, gen);
     if (!detach) {
       // The signer is unreachable; the cover gets its chance instead.

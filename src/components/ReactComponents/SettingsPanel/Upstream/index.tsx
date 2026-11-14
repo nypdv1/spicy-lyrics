@@ -24,28 +24,12 @@ import {
 import { playbackSection } from "./PlaybackSection.tsx";
 import { ReviewerPane, reviewerSection } from "./ReviewerSection.tsx";
 import { sourcesSection } from "./SourcesSection.tsx";
-import ForkSettingsBridge from "./ForkSettingsBridge.tsx";
 
 const aboutSection: SectionDef = {
   id: "about",
   title: "About",
   icon: AboutIcon,
   secondary: true,
-};
-
-const forkSection: SectionDef = {
-  id: "fork",
-  title: "Fork Settings",
-  icon: AboutIcon,
-  secondary: true,
-  groups: () => [{
-    settings: [{
-      id: "forkSettingsBridge",
-      label: "Fork settings",
-      keywords: "pixel custom legacy extras",
-      render: () => <ForkSettingsBridge />,
-    }],
-  }],
 };
 
 const SECTIONS: SectionDef[] = [
@@ -59,7 +43,6 @@ const SECTIONS: SectionDef[] = [
   advancedSection,
   bugReportSection,
   reviewerSection,
-  forkSection,
   aboutSection,
 ];
 

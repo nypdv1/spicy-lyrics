@@ -2,6 +2,8 @@ import { useStore } from "@nanostores/react";
 import {
   $animationFpsCap,
   $animationFpsCapEnabled,
+  $customFont,
+  $customFontEnabled,
   $skipSpicyFont,
   $useUpstreamSettingsLayout,
 } from "../../../../utils/stores.ts";
@@ -28,6 +30,25 @@ const groups: GroupDef[] = [
   {
     title: "Text",
     settings: [
+      {
+        id: "customFontEnabled",
+        label: "Use Custom Font",
+        description: "Use an installed font family instead of the bundled Spicy Lyrics font.",
+        keywords: "font family typeface",
+        Control: ({ label }) => (
+          <Toggle label={label} checked={useStore($customFontEnabled)} onChange={(v) => $customFontEnabled.set(v)} />
+        ),
+      },
+      {
+        id: "customFont",
+        label: "Custom Font Name",
+        description: "The installed font family to use for lyrics.",
+        keywords: "font family typeface",
+        useDisabled: () => !useStore($customFontEnabled) && "Turn on Use Custom Font to change this.",
+        Control: ({ disabled, label }) => (
+          <input className="sl-us-text-input" aria-label={label} disabled={disabled} placeholder="Spotify Mix" value={useStore($customFont)} onChange={(event) => $customFont.set(event.currentTarget.value)} spellCheck={false} />
+        ),
+      },
       {
         id: "skipSpicyFont",
         label: "Use System Font",

@@ -10,6 +10,10 @@ import {
   $romanizationDisplay,
   $syllableMerge,
   $syllablePace,
+  $spaceGravityMode,
+  $memeFormat,
+  $simpleLyricsMode,
+  $simpleLyricsModeRenderingType,
   RENDERER_VISUAL_STYLES,
   RENDERER_VISUAL_STYLE_LABELS,
   type RendererVisualStyle,
@@ -50,6 +54,33 @@ const groups: GroupDef[] = [
   {
     title: "Style",
     settings: [
+      {
+        id: "spaceGravityMode",
+        label: "Space Gravity Mode",
+        description: "Let word-synced lyrics drift and tumble while their timing animation continues.",
+        keywords: "gravity floating moving words",
+        Control: ({ label }) => <Toggle label={label} checked={useStore($spaceGravityMode)} onChange={(v) => $spaceGravityMode.set(v)} />,
+      },
+      {
+        id: "memeFormat",
+        label: "Unique Word Filters",
+        description: "Transform every lyric word.",
+        keywords: "gibberish uppercase lowercase meme",
+        Control: ({ label }) => <Select label={label} value={useStore($memeFormat)} options={["Off", "Gibberish", "all lowercase", "ALL UPPERCASE"]} onChange={(v) => $memeFormat.set(v)} />,
+      },
+      {
+        id: "simpleLyricsMode",
+        label: "Simple Lyrics Mode",
+        description: "Choose how simple lyric transitions render.",
+        keywords: "calculate animate transitions",
+        useDisabled: () => useStore($rendererVisualStyle) === "bloom" && "Only applies with the Spring renderer style.",
+        Control: ({ disabled, label }) => {
+          const enabled = useStore($simpleLyricsMode);
+          const renderingType = useStore($simpleLyricsModeRenderingType);
+          const value = enabled ? renderingType : "Off";
+          return <Select label={label} disabled={disabled} value={value} options={["Off", "calculate", "animate"]} labels={["Off", "Calculate", "Animate"]} onChange={(v) => { $simpleLyricsMode.set(v !== "Off"); if (v !== "Off") $simpleLyricsModeRenderingType.set(v); }} />;
+        },
+      },
       {
         id: "rendererVisualStyle",
         label: "Renderer Visual Style",

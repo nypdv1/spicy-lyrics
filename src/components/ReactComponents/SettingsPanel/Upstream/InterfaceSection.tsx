@@ -1,6 +1,10 @@
 import { useStore } from "@nanostores/react";
 import {
   $disableNpvLyrics,
+  $alwaysShowInFullscreen,
+  $animateFullscreenClose,
+  $escapeKeyFunction,
+  $openProfilesInBrowser,
   $hideNpvLyricsWhenUnavailable,
   $lockedMediaBox,
   $motionArtwork,
@@ -13,6 +17,7 @@ import {
   $removeSpotifyLyricsButton,
   $showNoLyricsNotice,
   $showVolumeSlider,
+  $showVolumeSliderFullscreen,
   $viewControlsPosition,
   type MotionArtworkPriority,
   type ReleaseYearPosition,
@@ -108,6 +113,41 @@ const groups: GroupDef[] = [
             onChange={(v) => $showVolumeSlider.set(v)}
           />
         ),
+      },
+    ],
+  },
+  {
+    title: "Fullscreen",
+    settings: [
+      {
+        id: "alwaysShowInFullscreen",
+        label: "Always Show in Fullscreen",
+        description: "Keep the fullscreen time or controls visible.",
+        keywords: "fullscreen controls time",
+        Control: ({ label }) => {
+          const value = useStore($alwaysShowInFullscreen);
+          return <Select label={label} value={value === "All" ? "Both" : value} options={["None", "Controls", "Time", "Both"]} onChange={(v) => $alwaysShowInFullscreen.set(v)} />;
+        },
+      },
+      {
+        id: "fullscreenVolumeSlider",
+        label: "Fullscreen Volume Slider",
+        description: "Show a volume slider in fullscreen and Cinema View.",
+        keywords: "volume cinema",
+        Control: ({ label }) => <Select label={label} value={useStore($showVolumeSliderFullscreen)} options={["Off", "Left", "Right", "Below"]} onChange={(v) => $showVolumeSliderFullscreen.set(v)} />,
+      },
+      {
+        id: "animateFullscreenClose",
+        label: "Animate Closing Fullscreen",
+        description: "Slide the lyrics page away when closing fullscreen.",
+        Control: ({ label }) => <Toggle label={label} checked={useStore($animateFullscreenClose)} onChange={(v) => $animateFullscreenClose.set(v)} />,
+      },
+      {
+        id: "escapeKeyFunction",
+        label: "Escape Key Function",
+        description: "Choose how Escape behaves in lyrics fullscreen.",
+        keywords: "keyboard exit",
+        Control: ({ label }) => <Select label={label} value={useStore($escapeKeyFunction)} options={["Default", "Exit Fullscreen", "Exit Fully"]} onChange={(v) => $escapeKeyFunction.set(v)} />,
       },
     ],
   },
@@ -217,6 +257,12 @@ const groups: GroupDef[] = [
   {
     title: "Windows and Buttons",
     settings: [
+      {
+        id: "openProfilesInBrowser",
+        label: "Open Profiles in Browser",
+        description: "Open contributor profiles in your browser instead of inside Spotify.",
+        Control: ({ label }) => <Toggle label={label} checked={useStore($openProfilesInBrowser)} onChange={(v) => $openProfilesInBrowser.set(v)} />,
+      },
       {
         id: "popupLyricsAllowed",
         label: "Popup Lyrics",

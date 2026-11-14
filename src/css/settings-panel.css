@@ -996,6 +996,8 @@ sl-generic-modal.SpicyLyricsModal .sl-modal-overlay {
     display: grid;
     gap: 14px;
     min-width: min(680px, 76vw);
+    padding: 16px;
+    box-sizing: border-box;
   }
 
   .sl-font-picker-search {
@@ -1037,7 +1039,6 @@ sl-generic-modal.SpicyLyricsModal .sl-modal-overlay {
   .sl-font-picker-option strong { font-size: 1.05rem; }
   .sl-font-picker-option span { color: var(--color-text-subdued); font-size: .83rem; line-height: 1.35; }
 
-  .sl-us-font-picker { display: flex; gap: 8px; align-items: center; min-width: 0; }
 
   .sl-sp-source-manager {
     display: flex;

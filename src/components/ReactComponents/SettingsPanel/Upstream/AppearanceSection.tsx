@@ -69,15 +69,13 @@ const groups: GroupDef[] = [
       {
         id: "systemFont",
         label: "System Font",
-        description: "Browse installed fonts with live previews, or type a family name.",
+        description: "Browse installed fonts with live previews.",
         keywords: "installed local system font family typeface",
         useDisabled: () => {
           if (!useStore($customFontEnabled)) return "Turn on Use Custom Font to change this.";
           return useStore($customFontSource) !== "system" && "Choose System Font as the Font Source first.";
         },
-        Control: ({ disabled, label }) => (
-          <span className="sl-us-font-picker"><FontPreviewPicker disabled={disabled} source="system" value={useStore($customFont)} onChange={(font) => $customFont.set(font)} /><input className="sl-us-text-input" aria-label={label} disabled={disabled} placeholder="Spotify Mix" value={useStore($customFont)} onChange={(event) => $customFont.set(event.currentTarget.value)} spellCheck={false} /></span>
-        ),
+        Control: ({ disabled }) => <FontPreviewPicker disabled={disabled} source="system" value={useStore($customFont)} onChange={(font) => $customFont.set(font)} />,
       },
       {
         id: "skipSpicyFont",

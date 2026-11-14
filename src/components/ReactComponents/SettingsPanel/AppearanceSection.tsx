@@ -62,7 +62,7 @@ export default function AppearanceSection({ query, sectionFilter, showHidden = f
   const r1 = visible("appearance-custom-font") && matches(query, "Use Custom Font", "Use a custom font instead of the bundled Spicy Lyrics font.");
   const r2 = visible("appearance-custom-font") && customFontEnabled && matches(query, "Font Source", "Choose Google Fonts or an installed system font family for lyrics.");
   const r2a = visible("appearance-custom-font") && customFontEnabled && customFontSource === "google" && matches(query, "Google Font", "Choose a font from Google Fonts.");
-  const r2b = visible("appearance-custom-font") && customFontEnabled && customFontSource === "system" && matches(query, "System Font Name", "Enter an installed font family name for lyrics.");
+  const r2b = visible("appearance-custom-font") && customFontEnabled && customFontSource === "system" && matches(query, "System Font", "Choose an installed font family for lyrics.");
   const r3 = visible("appearance-background-type") && matches(query, "Background Type", "Choose the dynamic, legacy, static image, or color background.");
   const r4 = visible("appearance-npv-background") && matches(query, "Display Dynamic Background in Now Playing View", "Show the animated background in the Now Playing panel.");
   const blurApplies = ["auto", "artistHeader", "coverArt"].includes(staticBackgroundMode);
@@ -158,8 +158,8 @@ export default function AppearanceSection({ query, sectionFilter, showHidden = f
       )}
 
       {r2b && (
-        <Row label="System Font" description="Browse installed fonts with live previews, or type a family name.">
-          <span className="sl-sp-btn-group"><FontPreviewPicker source="system" value={customFont} onChange={(value) => $customFont.set(value)} /><input className="sl-sp-text-input" type="text" placeholder="Spotify Mix" value={customFont} onChange={(e) => $customFont.set(e.currentTarget.value)} spellCheck={false} /></span>
+        <Row label="System Font" description="Browse installed fonts with live previews.">
+          <FontPreviewPicker source="system" value={customFont} onChange={(value) => $customFont.set(value)} />
         </Row>
       )}
 

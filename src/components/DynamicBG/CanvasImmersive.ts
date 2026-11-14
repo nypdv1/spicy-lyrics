@@ -30,7 +30,7 @@ const TRANSPARENT_STAGE_CLASS = "CanvasStageTransparent";
 const MUSIC_VIDEO_CLASS = "MusicVideoStage";
 // Spicy Themes briefly clears st-mv-active while its player reloads or buffers.
 // Keep the stage reserved long enough for that transient state to recover.
-const MUSIC_VIDEO_INACTIVE_GRACE_MS = 2000;
+const MUSIC_VIDEO_INACTIVE_GRACE_MS = 6000;
 // Matches --CanvasFade in CanvasImmersive.css.
 const FADE_MS = 900;
 const AMBIENT_WIDTH = 80;
@@ -307,6 +307,7 @@ function MountOnPage(page: HTMLElement) {
   const themeObserver = new MutationObserver(() => {
     // The side swap moves the stage; the music video follows it.
     if (mount && musicVideoStaged) placeMusicVideo(mount);
+    recoverMissingMusicVideo(page);
     const owned = themeOwnsBackground(page);
     if (owned === themeOwned) return;
     themeOwned = owned;
@@ -632,7 +633,7 @@ let musicVideoRecoveryTimer: ReturnType<typeof setTimeout> | null = null;
 let lastMusicVideoRecovery = 0;
 
 function recoverMissingMusicVideo(page: HTMLElement): void {
-  if (!musicVideoStaged || !page.classList.contains("st-mv-active")) return;
+  if (!musicVideoStaged) return;
   if (page.querySelector("#spicy-themes-mv")) {
     if (musicVideoRecoveryTimer) clearTimeout(musicVideoRecoveryTimer);
     musicVideoRecoveryTimer = null;
@@ -641,7 +642,11 @@ function recoverMissingMusicVideo(page: HTMLElement): void {
   if (musicVideoRecoveryTimer || Date.now() - lastMusicVideoRecovery < 10_000) return;
   musicVideoRecoveryTimer = setTimeout(() => {
     musicVideoRecoveryTimer = null;
-    if (!musicVideoStaged || !page.classList.contains("st-mv-active") || page.querySelector("#spicy-themes-mv")) return;
+    if (!musicVideoStaged || page.querySelector("#spicy-themes-mv")) return;
+    try {
+      (Spicetify.Player as any).dispatchEvent?.(new Event("songchange"));
+      return;
+    } catch {}
     const themes = (window as any).SpicyThemes;
     if (!themes?.getState?.()?.isEnabled || !themes.disable || !themes.enable) return;
     lastMusicVideoRecovery = Date.now();

@@ -654,14 +654,23 @@ function nodeIncludesMusicVideo(node: Node | null): boolean {
   return node instanceof Element && (node.id === "spicy-themes-mv" || !!node.querySelector("#spicy-themes-mv"));
 }
 
+function describeMusicVideoRemovalTarget(node: Node): string {
+  if (!(node instanceof Element)) return node.nodeName;
+  const classes = [...node.classList].slice(0, 4).join(".");
+  return `${node.tagName.toLowerCase()}${node.id ? `#${node.id}` : ""}${classes ? `.${classes}` : ""}`;
+}
+
 function traceMusicVideoRemoval(operation: string, target: Node, removed?: Node): void {
   if (!$developerMode.get()) return;
-  console.trace("[Spicy Lyrics] Music video removal", {
+  const details = {
     operation,
-    target,
-    removed,
+    target: describeMusicVideoRemovalTarget(target),
+    removed: removed ? describeMusicVideoRemovalTarget(removed) : undefined,
     track: playingTrackUri(),
-  });
+    stack: new Error("Music video removal caller").stack,
+  };
+  console.error("[Spicy Lyrics] Music video removal", details);
+  console.trace("[Spicy Lyrics] Music video removal trace");
 }
 
 // MutationObserver reports a removal after the caller is gone from the stack. In developer

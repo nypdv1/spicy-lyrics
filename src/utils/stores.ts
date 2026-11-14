@@ -237,7 +237,8 @@ export const $minimalLyricsMode = persistAtom<boolean>("minimalLyricsMode", fals
 // Which words sung in syllables are shown as one word: none, all, those whose
 // parts line up evenly, or those long enough to be drawn letter by letter.
 export type SyllableMerge = "off" | "full" | "steady" | "held";
-export const $syllableMerge = persistAtom<SyllableMerge>("syllableMerge", "steady");
+// Off by default: joining changes how every split word fills, so it is opt-in.
+export const $syllableMerge = persistAtom<SyllableMerge>("syllableMerge", "off");
 // A joined word drawn letter by letter times its letters by the syllables it
 // was joined from, instead of spreading them evenly over the whole word.
 export const $syllablePace = persistAtom<boolean>("syllablePace", false);

@@ -10,7 +10,7 @@ The merge keeps the fork's providers and source ordering, animator presets, Simp
 - Queue view with the Lyrics / Queue switch, Up Next card, grouped view controls, Player Below the Cover, portrait fullscreen.
 - Motion artwork (animated album covers) and the music-reactive dynamic background.
 - Romanization rewrite: Japanese, Korean and Chinese line-at-a-time romanization, "Romaji as Written", and romanization shown under each line (Lyrics Display > Romanization).
-- Join Split Words modes (Off / All / Steadily Sung / Held) and Keep Syllable Pace. The fork's previous toggle had no effect on syllable lyrics, since its reducer was fixed to "Default".
+- Join Split Words modes (Off / All / Steadily Sung / Held) and Keep Syllable Pace. It defaults to Off here (upstream defaults to Steadily Sung), so syllables keep filling one by one unless someone opts in. The fork's previous toggle had no effect on syllable lyrics, since its reducer was fixed to "Default".
 - Per-song playback offset, Lyrics Size, Auto-scroll Unsynced Lyrics.
 - TTML Reviewer mode and Bug Report, as rows in Settings > Advanced that open their own panes.
 - Experiment categories, the scroll target rules that keep background vocals from dragging the view back, and the TTML fixes listed below.

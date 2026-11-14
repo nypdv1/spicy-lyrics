@@ -5,6 +5,8 @@ import type { SyllableMerge } from "../../../stores.ts";
 interface JoinableSyllable {
   Text: string;
   TransliteratedText?: string;
+  // Unique Word Filters' text for the part (ProcessLyrics.ts).
+  GibberishText?: string;
   StartTime: number;
   EndTime: number;
   IsPartOfWord?: boolean;
@@ -60,12 +62,16 @@ function join<T extends JoinableSyllable>(run: T[]): T {
   const first = run[0];
   const last = run[run.length - 1];
   const hasRomanization = run.some((part) => part.TransliteratedText !== undefined);
+  const hasFilteredText = run.some((part) => part.GibberishText !== undefined);
 
   return {
     ...first,
     Text: run.map((part) => part.Text).join(""),
     ...(hasRomanization
       ? { TransliteratedText: run.map((part) => part.TransliteratedText ?? part.Text).join("") }
+      : {}),
+    ...(hasFilteredText
+      ? { GibberishText: run.map((part) => part.GibberishText ?? part.Text).join("") }
       : {}),
     EndTime: Math.max(...run.map((part) => part.EndTime)),
     IsPartOfWord: last.IsPartOfWord,

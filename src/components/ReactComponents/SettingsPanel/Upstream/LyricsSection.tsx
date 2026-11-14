@@ -3,6 +3,7 @@ import {
   $creditsFollowLastLine,
   $duetLinePadding,
   $lineHoverBackground,
+  $longWordThreshold,
   $lyricsSize,
   $minimalLyricsMode,
   $pinnedFooterMode,
@@ -123,6 +124,25 @@ const groups: GroupDef[] = [
             options={["off", "full", "steady", "held"]}
             labels={["Off", "All Words", "Steadily Sung", "Held Words"]}
             onChange={(v) => $syllableMerge.set(v as SyllableMerge)}
+          />
+        ),
+      },
+      {
+        id: "longWordThreshold",
+        label: "Long Word Minimum",
+        description: "A held word must last at least this long before it uses the stronger long-word letter effect.",
+        keywords: "held word duration timer threshold letter effect",
+        stacked: true,
+        Control: ({ label }) => (
+          <Slider
+            label={label}
+            value={useStore($longWordThreshold)}
+            min={250}
+            max={4000}
+            step={50}
+            defaultValue={1500}
+            unit="ms"
+            onChange={(v) => $longWordThreshold.set(v)}
           />
         ),
       },

@@ -18,7 +18,6 @@ export const ScrollingIntervalTime = Infinity;
 export const getLyricsBetweenShow = () => ($minimalLyricsMode.get() ? 5 : 3);
 
 export const SimpleLyricsMode_LetterEffectsStrengthConfig = {
-  LongerThan: 1500,
   Longer: {
     Glow: 0.4,
     YOffset: 0.45,

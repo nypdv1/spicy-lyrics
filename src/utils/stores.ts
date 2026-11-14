@@ -220,6 +220,8 @@ $staticBackgroundBlur.listen((value) => {
 });
 export const $simpleLyricsMode = persistAtom<boolean>("simpleLyricsMode", false);
 export const $simpleLyricsModeRenderingType = persistAtom<string>("simpleLyricsModeRenderingType", "calculate");
+// A held word uses the stronger long-word letter effect once it reaches this duration.
+export const $longWordThreshold = persistAtom<number>("longWordThreshold", 1500);
 // Lyrics text size as a percentage of what each view uses by default.
 export const $lyricsSize = persistAtom<number>("lyricsSize", 100);
 export const $rendererVisualStyle = persistAtom<RendererVisualStyle>("rendererVisualStyle", "spring");

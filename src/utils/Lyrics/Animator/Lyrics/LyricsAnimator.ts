@@ -3,6 +3,7 @@ import Spline from "cubic-spline";
 import { easeSinOut } from "d3-ease";
 import {
   $currentLyricsType,
+  $longWordThreshold,
   $rendererVisualStyle,
   $simpleLyricsMode,
   $simpleLyricsModeRenderingType,
@@ -2046,21 +2047,21 @@ export function Animate(position: number): void {
                   const baseScale =
                   LetterScaleSpline.at(percentageCount) *
                     (simpleFamily()
-                      ? word.TotalTime > config.LongerThan
+                      ? word.TotalTime > $longWordThreshold.get()
                         ? config.Longer.Scale
                         : config.Shorter.Scale
                       : 1);
                   const baseYOffset =
                     LetterYOffsetSpline.at(percentageCount) *
                     (simpleFamily()
-                      ? word.TotalTime > config.LongerThan
+                      ? word.TotalTime > $longWordThreshold.get()
                         ? config.Longer.YOffset
                         : config.Shorter.YOffset
                       : 1);
                   const baseGlow =
                     GlowSpline.at(percentageCount) *
                     (simpleFamily()
-                      ? word.TotalTime > config.LongerThan
+                      ? word.TotalTime > $longWordThreshold.get()
                         ? config.Longer.Glow
                         : config.Shorter.Glow
                       : 1);

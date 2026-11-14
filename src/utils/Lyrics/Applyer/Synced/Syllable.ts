@@ -148,6 +148,7 @@ function repairVocalStutters(syllables: SyllableData[]): SyllableData[] {
   const dashOnly = /^\s*[-\u2010-\u2015]\s*$/u;
   const dashAtStart = /^\s*[-\u2010-\u2015]\s*/u;
   const lettersOnly = (text: string) => text.normalize("NFKD").replace(/[^\p{L}\p{N}]/gu, "").toLocaleLowerCase();
+  const matches: Array<{ prefixStart: number; prefixEnd: number; targetStart: number; targetEnd: number }> = [];
 
   for (let index = 0; index < repaired.length - 1; index++) {
     const current = repaired[index];
@@ -173,18 +174,19 @@ function repairVocalStutters(syllables: SyllableData[]): SyllableData[] {
     const prefix = lettersOnly(prefixText.replace(dashAtEnd, ""));
     const nextText = (target.Text ?? "").replace(dashAtStart, "").trimStart();
     let repeatsPrefix = !!prefix && lettersOnly(nextText).startsWith(prefix);
+    let phraseLength = 1;
     // A stutter can repeat a whole phrase, while the dash is only carried by
     // its final timed word: `Wake` + `up—`, `wake` + `up—`, `wake` + `up`.
     // Find the shortest repeated token sequence ending in that dashed word.
     // We still join only across the dash, preserving the phrase's inner spaces.
     if (!repeatsPrefix) {
       const maximumPhraseLength = Math.min(8, index + 1, repaired.length - targetIndex);
-      for (let phraseLength = 2; phraseLength <= maximumPhraseLength; phraseLength++) {
-        const prefixStart = index - phraseLength + 1;
-        const phraseRepeats = Array.from({ length: phraseLength }).every((_, phraseIndex) => {
+      for (let candidateLength = 2; candidateLength <= maximumPhraseLength; candidateLength++) {
+        const prefixStart = index - candidateLength + 1;
+        const phraseRepeats = Array.from({ length: candidateLength }).every((_, phraseIndex) => {
           const source = repaired[prefixStart + phraseIndex]?.Text ?? "";
           const destination = repaired[targetIndex + phraseIndex]?.Text ?? "";
-          const sourceText = phraseIndex === phraseLength - 1
+          const sourceText = phraseIndex === candidateLength - 1
             ? source.replace(dashAtEnd, "")
             : source;
           const destinationText = phraseIndex === 0
@@ -194,6 +196,7 @@ function repairVocalStutters(syllables: SyllableData[]): SyllableData[] {
         });
         if (phraseRepeats) {
           repeatsPrefix = true;
+          phraseLength = candidateLength;
           break;
         }
       }
@@ -206,33 +209,66 @@ function repairVocalStutters(syllables: SyllableData[]): SyllableData[] {
     current.RestartStutterAfter = true;
     for (let separator = index + 1; separator < targetIndex; separator++) repaired[separator].IsPartOfWord = true;
     if (nextText !== target.Text) target.Text = nextText;
+    matches.push({
+      prefixStart: index - phraseLength + 1,
+      prefixEnd: index,
+      targetStart: targetIndex,
+      targetEnd: targetIndex + phraseLength - 1,
+    });
   }
-  return collapseVocalStutters(repaired);
+  return collapseVocalStutters(repaired, matches);
 }
 
 // `te-`, `te-`, `test` should render once as `test`.  Preserve every original
 // time range, though: the animator uses them to replay that one word at each
 // vocal restart instead of showing three independently animated fragments.
-function collapseVocalStutters(syllables: SyllableData[]): SyllableData[] {
+function collapseVocalStutters(
+  syllables: SyllableData[],
+  matches: Array<{ prefixStart: number; prefixEnd: number; targetStart: number; targetEnd: number }>
+): SyllableData[] {
+  if (matches.length === 0) return syllables;
+  const groups: Array<typeof matches> = [];
+  for (const match of matches) {
+    const previous = groups[groups.length - 1];
+    const previousEnd = previous ? Math.max(...previous.map((entry) => entry.targetEnd)) : -1;
+    if (previous && match.prefixStart <= previousEnd + 1) previous.push(match);
+    else groups.push([match]);
+  }
+
   const collapsed: SyllableData[] = [];
+  let groupIndex = 0;
   for (let index = 0; index < syllables.length; index++) {
-    if (!syllables[index].RestartStutterAfter) {
+    const group = groups[groupIndex];
+    if (!group || index !== group[0].prefixStart) {
       collapsed.push(syllables[index]);
       continue;
     }
 
-    const first = index;
-    while (index < syllables.length - 1 && syllables[index].RestartStutterAfter) index++;
-    const last = Math.min(index + 1, syllables.length - 1);
-    const run = syllables.slice(first, last + 1);
-    const final = run[run.length - 1];
+    const lastMatch = group[group.length - 1];
+    const last = lastMatch.targetEnd;
+    const display = syllables.slice(lastMatch.targetStart, last + 1);
+    const final = display[display.length - 1];
+    const text = display.reduce(
+      (joined, part, partIndex) =>
+        `${joined}${partIndex > 0 && !display[partIndex - 1].IsPartOfWord ? " " : ""}${part.Text}`,
+      ""
+    );
+    const phraseRanges = [
+      { start: group[0].prefixStart, end: group[0].prefixEnd },
+      ...group.map((entry) => ({ start: entry.targetStart, end: entry.targetEnd })),
+    ];
     collapsed.push({
       ...final,
-      StartTime: run[0].StartTime,
+      Text: text,
+      StartTime: syllables[index].StartTime,
       EndTime: final.EndTime,
-      RestartRanges: run.map(({ StartTime, EndTime }) => ({ StartTime, EndTime })),
+      RestartRanges: phraseRanges.map(({ start, end }) => ({
+        StartTime: syllables[start].StartTime,
+        EndTime: syllables[end].EndTime,
+      })),
     });
     index = last;
+    groupIndex++;
   }
   return collapsed;
 }

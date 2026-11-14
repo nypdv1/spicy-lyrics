@@ -54,11 +54,43 @@ export function GetTrackIsrc(trackId: string): Promise<string | null> {
 
 const isModelSynced = (ttml: string): boolean => /<tt\b[^>]*\blrc:byModel\s*=\s*["']true["']/.test(ttml);
 
+const MODEL_SYNC_MIN_FINAL_WORD_DURATION = 0.15;
+const MODEL_SYNC_SHORT_FINAL_WORD_DURATION = 0.1;
+
+/**
+ * lrc.red's model occasionally gives a line's final word an almost zero-length
+ * window. Keep the word as one unit (it may be split across several syllables)
+ * and extend only that last syllable's end so the whole final word lasts 150 ms.
+ */
+function fixShortModelSyncedLineEndings(lyrics: any): void {
+  if (lyrics?.Type !== "Syllable" || !Array.isArray(lyrics.Content)) return;
+
+  for (const vocal of lyrics.Content) {
+    const syllables = vocal?.Lead?.Syllables;
+    if (!Array.isArray(syllables) || syllables.length === 0) continue;
+
+    const lastIndex = syllables.length - 1;
+    let finalWordStartIndex = lastIndex;
+    while (finalWordStartIndex > 0 && syllables[finalWordStartIndex - 1]?.IsPartOfWord) {
+      finalWordStartIndex--;
+    }
+
+    const first = syllables[finalWordStartIndex];
+    const last = syllables[lastIndex];
+    if (typeof first?.StartTime !== "number" || typeof last?.EndTime !== "number") continue;
+    if (last.EndTime - first.StartTime >= MODEL_SYNC_SHORT_FINAL_WORD_DURATION) continue;
+
+    last.EndTime = first.StartTime + MODEL_SYNC_MIN_FINAL_WORD_DURATION;
+    vocal.Lead.EndTime = last.EndTime;
+  }
+}
+
 /** The parsed lyrics for one lrc.red TTML file, labelled as lrc.red (and model-synced, when it is). */
 export function LyricsFromLrcRedTTML(ttml: string): any | null {
   const parsed = parseTTMLToLyrics(ttml);
   if (!parsed?.Type) return null;
   const byModel = isModelSynced(ttml);
+  if (byModel) fixShortModelSyncedLineEndings(parsed);
   return createProviderResult(
     {
       ...parsed,

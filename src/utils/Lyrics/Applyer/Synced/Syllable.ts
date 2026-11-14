@@ -168,9 +168,35 @@ function repairVocalStutters(syllables: SyllableData[]): SyllableData[] {
     if (!target) continue;
     const prefix = lettersOnly(prefixText.replace(dashAtEnd, ""));
     const nextText = (target.Text ?? "").replace(dashAtStart, "").trimStart();
+    let repeatsPrefix = !!prefix && lettersOnly(nextText).startsWith(prefix);
+    // A stutter can repeat a whole phrase, while the dash is only carried by
+    // its final timed word: `Wake` + `up—`, `wake` + `up—`, `wake` + `up`.
+    // Find the shortest repeated token sequence ending in that dashed word.
+    // We still join only across the dash, preserving the phrase's inner spaces.
+    if (!repeatsPrefix) {
+      const maximumPhraseLength = Math.min(8, index + 1, repaired.length - targetIndex);
+      for (let phraseLength = 2; phraseLength <= maximumPhraseLength; phraseLength++) {
+        const prefixStart = index - phraseLength + 1;
+        const phraseRepeats = Array.from({ length: phraseLength }).every((_, phraseIndex) => {
+          const source = repaired[prefixStart + phraseIndex]?.Text ?? "";
+          const destination = repaired[targetIndex + phraseIndex]?.Text ?? "";
+          const sourceText = phraseIndex === phraseLength - 1
+            ? source.replace(dashAtEnd, "")
+            : source;
+          const destinationText = phraseIndex === 0
+            ? destination.replace(dashAtStart, "").trimStart()
+            : destination;
+          return lettersOnly(sourceText) !== "" && lettersOnly(sourceText) === lettersOnly(destinationText);
+        });
+        if (phraseRepeats) {
+          repeatsPrefix = true;
+          break;
+        }
+      }
+    }
     // Only repair repeated starts (te- test), never an ordinary hyphenated
     // compound such as "well- known".
-    if (!prefix || !lettersOnly(nextText).startsWith(prefix)) continue;
+    if (!repeatsPrefix) continue;
     if (movesDashToCurrent) current.Text = prefixText;
     current.IsPartOfWord = true;
     for (let separator = index + 1; separator < targetIndex; separator++) repaired[separator].IsPartOfWord = true;

@@ -305,12 +305,12 @@ function MountOnPage(page: HTMLElement) {
   // The page's classes change all the time (our own toggle included); only a change in
   // whether the theme owns the background or a live music video starts/stops is worth a refresh.
   let themeOwned = themeOwnsBackground(page);
-  let videoActive = page.classList.contains("st-mv-active");
+  let videoActive = hasLiveMusicVideo(page);
   const themeObserver = new MutationObserver(() => {
     // The side swap moves the stage; the music video follows it.
     if (mount && musicVideoStaged) placeMusicVideo(mount);
     recoverMissingMusicVideo(page);
-    const nextVideoActive = page.classList.contains("st-mv-active");
+    const nextVideoActive = hasLiveMusicVideo(page);
     if (nextVideoActive !== videoActive) {
       videoActive = nextVideoActive;
       void Refresh();
@@ -322,7 +322,14 @@ function MountOnPage(page: HTMLElement) {
     void Refresh();
   });
   themeObserver.observe(page, { attributes: true, attributeFilter: ["class"] });
-  const videoObserver = new MutationObserver(() => recoverMissingMusicVideo(page));
+  let videoPlayerPresent = !!page.querySelector("#spicy-themes-mv");
+  const videoObserver = new MutationObserver(() => {
+    recoverMissingMusicVideo(page);
+    const nextVideoPlayerPresent = !!page.querySelector("#spicy-themes-mv");
+    if (nextVideoPlayerPresent === videoPlayerPresent) return;
+    videoPlayerPresent = nextVideoPlayerPresent;
+    void Refresh();
+  });
   videoObserver.observe(page, { childList: true, subtree: true });
   targetDocument.addEventListener("visibilitychange", syncPlayback);
 
@@ -641,12 +648,19 @@ let musicVideoRecoveryTimer: ReturnType<typeof setTimeout> | null = null;
 let lastMusicVideoRecovery = 0;
 let lastMusicVideoTrace = "";
 
+// Some Spicy Themes versions mount their player without adding st-mv-active.
+// The player itself is the reliable live signal in that case.
+function hasLiveMusicVideo(page: HTMLElement): boolean {
+  return page.classList.contains("st-mv-active") || !!page.querySelector("#spicy-themes-mv");
+}
+
 function traceMusicVideo(reason: string, page: HTMLElement): void {
   const state = {
     reason,
     activeClass: page.classList.contains("st-mv-active"),
     stageClass: page.classList.contains(MUSIC_VIDEO_CLASS),
     playerPresent: !!page.querySelector("#spicy-themes-mv"),
+    liveSignal: hasLiveMusicVideo(page),
     staged: musicVideoStaged,
     eligible: musicVideoStageEligible(page),
     releasePending: !!musicVideoReleaseTimer,
@@ -701,7 +715,7 @@ function musicVideoStageEligible(page: HTMLElement): boolean {
 /** Puts the music video on the stage, or takes it off. True while it's there. */
 function syncMusicVideoStage(m: Mount): boolean {
   const eligible = musicVideoStageEligible(m.page);
-  const videoActive = m.page.classList.contains("st-mv-active");
+  const videoActive = hasLiveMusicVideo(m.page);
   traceMusicVideo("stage sync", m.page);
   if (videoActive) {
     clearMusicVideoReleaseTimer();
@@ -711,7 +725,7 @@ function syncMusicVideoStage(m: Mount): boolean {
   } else if (musicVideoStaged && eligible && !musicVideoReleaseTimer) {
     musicVideoReleaseTimer = setTimeout(() => {
       musicVideoReleaseTimer = null;
-      if (mount !== m || m.page.classList.contains("st-mv-active") || !musicVideoStageEligible(m.page)) return;
+      if (mount !== m || hasLiveMusicVideo(m.page) || !musicVideoStageEligible(m.page)) return;
       traceMusicVideo("inactive grace elapsed; releasing stage", m.page);
       musicVideoStaged = false;
       releaseMusicVideo(m.page);

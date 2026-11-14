@@ -10,6 +10,8 @@ interface JoinableSyllable {
   StartTime: number;
   EndTime: number;
   IsPartOfWord?: boolean;
+  // A visually connected vocal stutter must retain independent timing units.
+  RestartStutterAfter?: boolean;
   Parts?: JoinableSyllable[];
   TransliteratedIsPartOfWord?: boolean;
 }
@@ -98,6 +100,7 @@ export function JoinSplitWords<T extends JoinableSyllable>(
     let end = i;
     while (
       syllables[end].IsPartOfWord &&
+      !syllables[end].RestartStutterAfter &&
       end + 1 < syllables.length &&
       !StartsNewWord(syllables[end], syllables[end + 1])
     ) {

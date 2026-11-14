@@ -70,6 +70,8 @@ interface SyllableData {
   StartTime: number;
   EndTime: number;
   IsPartOfWord?: boolean;
+  // Continues visually, but starts a fresh word-timing animation after this part.
+  RestartStutterAfter?: boolean;
   TransliteratedIsPartOfWord?: boolean;
   // A word joined from syllables keeps them here.
   Parts?: SyllableData[];
@@ -199,6 +201,7 @@ function repairVocalStutters(syllables: SyllableData[]): SyllableData[] {
     if (!repeatsPrefix) continue;
     if (movesDashToCurrent) current.Text = prefixText;
     current.IsPartOfWord = true;
+    current.RestartStutterAfter = true;
     for (let separator = index + 1; separator < targetIndex; separator++) repaired[separator].IsPartOfWord = true;
     if (nextText !== target.Text) target.Text = nextText;
   }
@@ -250,7 +253,11 @@ function planWords(
   for (let i = 0; i < parts.length; i++) {
     let end = i;
     if (isBloomRenderer()) {
-      while (PickPartOfWord(parts[end], useRomanized) && end + 1 < parts.length) end++;
+      while (
+        PickPartOfWord(parts[end], useRomanized) &&
+        !parts[end].RestartStutterAfter &&
+        end + 1 < parts.length
+      ) end++;
     }
     if (end === i) {
       const letters = lettersOf(i, durations[i]);

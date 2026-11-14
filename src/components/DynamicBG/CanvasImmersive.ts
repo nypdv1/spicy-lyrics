@@ -85,6 +85,7 @@ type Mount = {
   current: 0 | 1;
   resizeObserver: ResizeObserver;
   themeObserver: MutationObserver;
+  videoObserver: MutationObserver;
   stopFrames: () => void;
   stopVisibility: () => void;
 };
@@ -312,6 +313,8 @@ function MountOnPage(page: HTMLElement) {
     void Refresh();
   });
   themeObserver.observe(page, { attributes: true, attributeFilter: ["class"] });
+  const videoObserver = new MutationObserver(() => recoverMissingMusicVideo(page));
+  videoObserver.observe(page, { childList: true, subtree: true });
   targetDocument.addEventListener("visibilitychange", syncPlayback);
 
   mount = {
@@ -325,6 +328,7 @@ function MountOnPage(page: HTMLElement) {
     current: 0,
     resizeObserver,
     themeObserver,
+    videoObserver,
     stopFrames: onAnimationFrame(drawAmbientFrame, targetDocument.defaultView ?? window),
     stopVisibility: () => targetDocument.removeEventListener("visibilitychange", syncPlayback),
   };
@@ -341,6 +345,7 @@ function Unmount() {
   SetKawarpSuspended(PAGE_BACKGROUND_KEY, false);
   mount.resizeObserver.disconnect();
   mount.themeObserver.disconnect();
+  mount.videoObserver.disconnect();
   mount.stopFrames();
   mount.stopVisibility();
   for (const layer of mount.layers) releaseLayer(layer);
@@ -623,6 +628,27 @@ function syncPlayback() {
 
 let musicVideoStaged = false;
 let musicVideoReleaseTimer: ReturnType<typeof setTimeout> | null = null;
+let musicVideoRecoveryTimer: ReturnType<typeof setTimeout> | null = null;
+let lastMusicVideoRecovery = 0;
+
+function recoverMissingMusicVideo(page: HTMLElement): void {
+  if (!musicVideoStaged || !page.classList.contains("st-mv-active")) return;
+  if (page.querySelector("#spicy-themes-mv")) {
+    if (musicVideoRecoveryTimer) clearTimeout(musicVideoRecoveryTimer);
+    musicVideoRecoveryTimer = null;
+    return;
+  }
+  if (musicVideoRecoveryTimer || Date.now() - lastMusicVideoRecovery < 10_000) return;
+  musicVideoRecoveryTimer = setTimeout(() => {
+    musicVideoRecoveryTimer = null;
+    if (!musicVideoStaged || !page.classList.contains("st-mv-active") || page.querySelector("#spicy-themes-mv")) return;
+    const themes = (window as any).SpicyThemes;
+    if (!themes?.getState?.()?.isEnabled || !themes.disable || !themes.enable) return;
+    lastMusicVideoRecovery = Date.now();
+    themes.disable();
+    setTimeout(() => themes.enable(), 50);
+  }, 1500);
+}
 
 function clearMusicVideoReleaseTimer() {
   if (!musicVideoReleaseTimer) return;
@@ -696,6 +722,8 @@ function placeMusicVideo(m: Mount) {
 
 function releaseMusicVideo(page: HTMLElement) {
   clearMusicVideoReleaseTimer();
+  if (musicVideoRecoveryTimer) clearTimeout(musicVideoRecoveryTimer);
+  musicVideoRecoveryTimer = null;
   musicVideoStaged = false;
   page.classList.remove(MUSIC_VIDEO_CLASS);
   for (const name of ["--SL-MusicVideoX", "--SL-MusicVideoY", "--SL-MusicVideoW", "--SL-MusicVideoH", "--SL-MusicVideoMask"]) {

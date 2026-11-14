@@ -150,7 +150,7 @@ function repairVocalStutters(syllables: SyllableData[]): SyllableData[] {
   const lettersOnly = (text: string) => text.normalize("NFKD").replace(/[^\p{L}\p{N}]/gu, "").toLocaleLowerCase();
   const matches: Array<{
     prefixStart: number; prefixEnd: number; targetStart: number; targetEnd: number;
-    displayStart: number; displayEnd: number;
+    displayStart: number; displayEnd: number; suffix: boolean;
   }> = [];
 
   for (let index = 0; index < repaired.length - 1; index++) {
@@ -239,6 +239,7 @@ function repairVocalStutters(syllables: SyllableData[]): SyllableData[] {
       targetEnd: targetIndex + phraseLength - 1,
       displayStart: suffixStutter ? suffixStart : targetIndex,
       displayEnd: suffixStutter ? index : targetIndex + phraseLength - 1,
+      suffix: suffixStutter,
     });
   }
   return collapseVocalStutters(repaired, matches);
@@ -251,7 +252,7 @@ function collapseVocalStutters(
   syllables: SyllableData[],
   matches: Array<{
     prefixStart: number; prefixEnd: number; targetStart: number; targetEnd: number;
-    displayStart: number; displayEnd: number;
+    displayStart: number; displayEnd: number; suffix: boolean;
   }>
 ): SyllableData[] {
   if (matches.length === 0) return syllables;
@@ -274,6 +275,32 @@ function collapseVocalStutters(
 
     const lastMatch = group[group.length - 1];
     const last = lastMatch.targetEnd;
+    // `missile-ile`: keep the authored `mis` + `sile` layout. Only the final
+    // syllable receives the repeat timings, so its `-ile` cue replays that
+    // syllable instead of replaying the complete visible word.
+    if (group.every((entry) => entry.suffix)) {
+      const parts = syllables.slice(group[0].prefixStart, group[0].prefixEnd + 1);
+      const ending = parts[parts.length - 1];
+      const replayRanges = [
+        { StartTime: ending.StartTime, EndTime: ending.EndTime },
+        ...group.map((entry) => ({
+          StartTime: syllables[entry.targetStart].StartTime,
+          EndTime: syllables[entry.targetEnd].EndTime,
+        })),
+      ];
+      collapsed.push(
+        ...parts.slice(0, -1),
+        {
+          ...ending,
+          Text: (ending.Text ?? "").replace(/[-\u2010-\u2015]\s*$/u, ""),
+          IsPartOfWord: syllables[last].IsPartOfWord,
+          RestartRanges: replayRanges,
+        }
+      );
+      index = last;
+      groupIndex++;
+      continue;
+    }
     const display = syllables.slice(lastMatch.displayStart, lastMatch.displayEnd + 1);
     const final = display[display.length - 1];
     const joinPhraseText = (pick: (part: SyllableData) => string) =>

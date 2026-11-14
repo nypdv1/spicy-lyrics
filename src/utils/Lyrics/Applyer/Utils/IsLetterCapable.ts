@@ -1,11 +1,7 @@
-import { $simpleLyricsMode, isBloomRenderer } from "../../../../utils/stores.ts";
-
-// The shortest word that can be split, per mode.
-const MinDuration = 1000;
-const SimpleLyricsModeMinDuration = 1050;
+import { $longWordThreshold, $simpleLyricsMode, isBloomRenderer } from "../../../../utils/stores.ts";
 
 const Spring = (letterLength: number, totalDuration: number) => {
-  return totalDuration >= MinDuration;
+  return totalDuration >= $longWordThreshold.get();
 };
 
 // Bloom: only words held a second or more with two to seven letters are split.
@@ -20,14 +16,14 @@ const Bloom = (letterLength: number, totalDuration: number, isBackground: boolea
   return (
     letterLength >= RefreshedMinLetters &&
     letterLength <= RefreshedMaxLetters &&
-    totalDuration >= MinDuration
+    totalDuration >= $longWordThreshold.get()
   );
 };
 
 // Simple Lyrics Mode without its Refreshed look: up to twelve letters, held a little longer.
 const SimpleLyricsMode = (letterLength: number, totalDuration: number) => {
   if (letterLength > 12) return false;
-  return totalDuration >= SimpleLyricsModeMinDuration;
+  return totalDuration >= $longWordThreshold.get();
 };
 
 /**
@@ -35,7 +31,7 @@ const SimpleLyricsMode = (letterLength: number, totalDuration: number) => {
  * skip splitting the word just to count its letters.
  */
 export function MinLetterCapableDuration(): number {
-  return $simpleLyricsMode.get() && !isBloomRenderer() ? SimpleLyricsModeMinDuration : MinDuration;
+  return $longWordThreshold.get();
 }
 
 export function IsLetterCapable(letterLength: number, totalDuration: number, isBackground = false) {

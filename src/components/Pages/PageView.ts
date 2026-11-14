@@ -42,6 +42,7 @@ import {
   $enableExperimentalWordSync,
   $duetLinePadding,
   $lineHoverBackground,
+  $longWordThreshold,
   $memeFormat,
   $lyricsContainerExists,
   $lyricsRendererPaused,
@@ -1216,6 +1217,7 @@ $enableExperimentalWordSync.listen(() => {
 
 $syllableMerge.listen(rebuildLyrics);
 $syllablePace.listen(rebuildLyrics);
+$longWordThreshold.listen(rebuildLyrics);
 // Rows under each line are built with romanization off too, so the toggle can
 // open them in place; switching to or from them always renders again.
 $romanizationDisplay.listen(rebuildLyrics);

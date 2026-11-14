@@ -273,7 +273,7 @@
   direction: ltr;
 }
 
-#SpicyLyricsPage.SpicyRenderer[data-animator-preset="Default"] .LyricsContainer .LyricsContent .line {
+#SpicyLyricsPage.SpicyRenderer:is([data-animator-preset="Default"], .BloomRenderer) .LyricsContainer .LyricsContent .line {
   --DefaultLyricsScale: 0.95;
   --DefaultEmphasisLyricsScale: 0.95;
 }
@@ -485,10 +485,10 @@
 }
 
 /* Keep the active line responsive to inspection without changing its timing state. */
-#SpicyLyricsPage.SpicyRenderer:not(.SpaceGravityMode) .LyricsContainer .LyricsContent .line.Active:not(.musical-line):hover,
-#SpicyLyricsPage.SpicyRenderer:not(.SpaceGravityMode) .LyricsContainer .LyricsContent .line.Active:not(.musical-line):hover .word,
-#SpicyLyricsPage.SpicyRenderer:not(.SpaceGravityMode) .LyricsContainer .LyricsContent .line.Active:not(.musical-line):hover .letter,
-#SpicyLyricsPage.SpicyRenderer:not(.SpaceGravityMode) .LyricsContainer .LyricsContent .line.Active:not(.musical-line):hover .letterGroup {
+#SpicyLyricsPage.SpicyRenderer:not(.SpaceGravityMode, .BloomRenderer) .LyricsContainer .LyricsContent .line.Active:not(.musical-line):hover,
+#SpicyLyricsPage.SpicyRenderer:not(.SpaceGravityMode, .BloomRenderer) .LyricsContainer .LyricsContent .line.Active:not(.musical-line):hover .word,
+#SpicyLyricsPage.SpicyRenderer:not(.SpaceGravityMode, .BloomRenderer) .LyricsContainer .LyricsContent .line.Active:not(.musical-line):hover .letter,
+#SpicyLyricsPage.SpicyRenderer:not(.SpaceGravityMode, .BloomRenderer) .LyricsContainer .LyricsContent .line.Active:not(.musical-line):hover .letterGroup {
   text-shadow: 0 0 12px rgba(255, 255, 255, 0.8) !important;
 }
 
@@ -536,13 +536,13 @@
    Keep their size fixed when more text follows, including nested emphasis
    letters; lift and glow still animate. Final syllables, standalone words,
    and Space Gravity retain their scale effects. */
-#SpicyLyricsPage.SpicyRenderer:not(.SpaceGravityMode):not([data-animator-preset="Default"])
+#SpicyLyricsPage.SpicyRenderer:not(.SpaceGravityMode, .BloomRenderer):not([data-animator-preset="Default"])
   .LyricsContainer
   .LyricsContent
   .line
   .word-group
   > :is(.word, .letterGroup):not(:only-child, .LastWordInLine),
-#SpicyLyricsPage.SpicyRenderer:not(.SpaceGravityMode):not([data-animator-preset="Default"])
+#SpicyLyricsPage.SpicyRenderer:not(.SpaceGravityMode, .BloomRenderer):not([data-animator-preset="Default"])
   .LyricsContainer
   .LyricsContent
   .line

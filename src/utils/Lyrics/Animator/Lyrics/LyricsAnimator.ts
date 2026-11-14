@@ -1641,7 +1641,7 @@ export function Animate(position: number): void {
 
       if (lineState === "Active") {
         if (Blurring_LastLine !== index) {
-          applyBlur(arr, index, BlurMultiplier * $animatorValues.get().blurStrength);
+          applyBlur(arr, index, BlurMultiplier * (isBloomRenderer() ? 1 : $animatorValues.get().blurStrength));
           //applyScale(arr, index);
           Blurring_LastLine = index;
         }
@@ -2782,7 +2782,7 @@ export function Animate(position: number): void {
 
       if (lineState === "Active") {
         if (Blurring_LastLine !== index) {
-          applyBlur(arr, index, BlurMultiplier * $animatorValues.get().blurStrength);
+          applyBlur(arr, index, BlurMultiplier * (isBloomRenderer() ? 1 : $animatorValues.get().blurStrength));
           //applyScale(arr, index);
           Blurring_LastLine = index;
         }

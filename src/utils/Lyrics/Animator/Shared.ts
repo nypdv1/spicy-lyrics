@@ -1,7 +1,9 @@
 import { $animatorPreset } from "./Tuning.ts";
+import { isBloomRenderer } from "../../stores.ts";
 
-const getIdleLyricsScale = () => $animatorPreset.get() === "Default" ? .95 : 1;
-const getIdleEmphasisLyricsScale = () => $animatorPreset.get() === "Default" ? .95 : 1;
+// Bloom always rests at the Default preset's scale: the presets shape Spring only.
+const getIdleLyricsScale = () => $animatorPreset.get() === "Default" || isBloomRenderer() ? .95 : 1;
+const getIdleEmphasisLyricsScale = () => $animatorPreset.get() === "Default" || isBloomRenderer() ? .95 : 1;
 const timeOffset = 0;
 const DurationTimeOffset = 0;
 const BlurMultiplier = 1.25;

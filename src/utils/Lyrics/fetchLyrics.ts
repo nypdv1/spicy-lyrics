@@ -1,5 +1,5 @@
 import Defaults, { isDev } from "../../components/Global/Defaults.ts";
-import { $currentLyricsData, $currentLyricsType, $currentlyFetching } from "../stores.ts";
+import { $currentLyricsData, $currentLyricsType, $currentlyFetching, $lrcRedAcceptModelSynced } from "../stores.ts";
 import { SpotifyPlayer } from "../../components/Global/SpotifyPlayer.ts";
 import PageView, { PageContainer } from "../../components/Pages/PageView.ts";
 import { JapaneseRomajiIsCurrent, ProcessLyrics } from "./ProcessLyrics.ts";
@@ -88,6 +88,7 @@ function getLyricsSourceCacheSignature(): string {
     disabled: Defaults.DisabledLyricsSourceIds,
     ignoreMusixmatchWordSync: Defaults.IgnoreMusixmatchWordSync,
     prioritizeAppleMusicQuality: Defaults.PrioritizeAppleMusicQuality,
+    lrcRedAcceptModelSynced: $lrcRedAcceptModelSynced.get(),
   });
 }
 

@@ -11,6 +11,7 @@ export const ProviderMap = {
     "spotify": "Spotify",
     "apple": "Apple Music",
     "musixmatch": "Musixmatch",
+    "lrcred": "lrc.red",
     "lrclib": "LRCLIB",
     "netease": "Netease",
 }

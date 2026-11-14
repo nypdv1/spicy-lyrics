@@ -48,6 +48,7 @@ export const SETTING_CATALOG = [
   ["interface-escape-key", "Escape Key Function", "Choose how Escape behaves in lyrics fullscreen.", "Interface"],
   ["interface-disable-npv", "Disable NPV Lyrics", "Never show the lyrics card in the Now Playing sidebar.", "Interface"],
   ["interface-hide-empty-npv", "Hide NPV Lyrics When No Lyrics Are Available", "Remove the lyrics card when the current song has no lyrics.", "Interface"],
+  ["sources-lrcred-model", "Accept Model-Synced lrc.red Lyrics", "Use lrc.red lyrics synced by its model.", "Sources"],
   ["advanced-cache-button", "Lyrics View Cache Button", "Show a selected cache action in the lyrics view controls.", "Sources"],
   ["advanced-cache-actions", "Cache Actions", "Clear all current-song caches, clear current in-memory lyrics, or clear stored lyrics cache.", "Sources"],
 ] as const;

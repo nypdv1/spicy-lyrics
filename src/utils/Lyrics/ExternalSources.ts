@@ -7,6 +7,7 @@ import { fetchMusixmatchLyrics } from "./Sources/Musixmatch.ts";
 import { fetchSpotifyLyrics } from "./Sources/Spotify.ts";
 import { fetchLRCLIBLyrics } from "./Sources/Lrclib.ts";
 import { fetchNeteaseLyrics } from "./Sources/Netease.ts";
+import { fetchLrcRedLyrics } from "./Sources/LrcRed.ts";
 
 export { refreshMusixmatchToken } from "./Sources/Musixmatch.ts";
 
@@ -113,6 +114,7 @@ export async function fetchLyricsFromProviders(
       case "musixmatch": return fetchMusixmatchLyrics(trackInfo, getSpicyRaw);
       case "apple": return fetchAppleMusicLyrics(getSpicyRaw());
       case "spotify": return fetchSpotifyLyrics(trackInfo);
+      case "lrcred": return withProviderTimeout(fetchLrcRedLyrics(trackInfo), FALLBACK_PROVIDER_TIMEOUT_MS * 2);
       case "lrclib": return withProviderTimeout(fetchLRCLIBLyrics(trackInfo), FALLBACK_PROVIDER_TIMEOUT_MS);
       case "netease": return withProviderTimeout(fetchNeteaseLyrics(trackInfo), FALLBACK_PROVIDER_TIMEOUT_MS);
       default: return Promise.resolve(null);

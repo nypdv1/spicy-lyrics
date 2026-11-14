@@ -11,6 +11,7 @@ import {
 import { Select, Slider, Toggle } from "./components.tsx";
 import { AppearanceIcon } from "./icons.tsx";
 import { GOOGLE_FONT_OPTIONS } from "../../../../utils/googleFonts.ts";
+import { FontPreviewPicker } from "../FontPreviewPicker.tsx";
 import type { GroupDef, SectionDef } from "./model.ts";
 
 // Built once: the Control components must keep their identity across renders.
@@ -54,7 +55,7 @@ const groups: GroupDef[] = [
       {
         id: "googleFont",
         label: "Google Font",
-        description: "Choose a font to load through coolLabs Fonts.",
+        description: "Browse Google Fonts with live previews. The selected font loads through coolLabs Fonts.",
         keywords: "google font family typeface coollabs",
         useDisabled: () => {
           if (!useStore($customFontEnabled)) return "Turn on Use Custom Font to change this.";
@@ -62,20 +63,20 @@ const groups: GroupDef[] = [
         },
         Control: ({ disabled, label }) => {
           const value = useStore($customFont);
-          return <Select label={label} disabled={disabled} value={GOOGLE_FONT_OPTIONS.includes(value as typeof GOOGLE_FONT_OPTIONS[number]) ? value : ""} options={["", ...GOOGLE_FONT_OPTIONS]} labels={["Choose a font…", ...GOOGLE_FONT_OPTIONS]} onChange={(font) => $customFont.set(font)} />;
+          return <FontPreviewPicker disabled={disabled} source="google" value={GOOGLE_FONT_OPTIONS.includes(value as typeof GOOGLE_FONT_OPTIONS[number]) ? value : ""} onChange={(font) => $customFont.set(font)} />;
         },
       },
       {
         id: "systemFont",
-        label: "System Font Name",
-        description: "Enter any font family installed on this computer.",
+        label: "System Font",
+        description: "Browse installed fonts with live previews, or type a family name.",
         keywords: "installed local system font family typeface",
         useDisabled: () => {
           if (!useStore($customFontEnabled)) return "Turn on Use Custom Font to change this.";
           return useStore($customFontSource) !== "system" && "Choose System Font as the Font Source first.";
         },
         Control: ({ disabled, label }) => (
-          <input className="sl-us-text-input" aria-label={label} disabled={disabled} placeholder="Spotify Mix" value={useStore($customFont)} onChange={(event) => $customFont.set(event.currentTarget.value)} spellCheck={false} />
+          <span className="sl-us-font-picker"><FontPreviewPicker disabled={disabled} source="system" value={useStore($customFont)} onChange={(font) => $customFont.set(font)} /><input className="sl-us-text-input" aria-label={label} disabled={disabled} placeholder="Spotify Mix" value={useStore($customFont)} onChange={(event) => $customFont.set(event.currentTarget.value)} spellCheck={false} /></span>
         ),
       },
       {

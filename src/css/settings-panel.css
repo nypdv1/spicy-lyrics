@@ -984,6 +984,61 @@ sl-generic-modal.SpicyLyricsModal .sl-modal-overlay {
     flex-wrap: wrap;
   }
 
+  .sl-font-picker-trigger {
+    min-width: 150px;
+    max-width: 230px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .sl-font-picker {
+    display: grid;
+    gap: 14px;
+    min-width: min(680px, 76vw);
+  }
+
+  .sl-font-picker-search {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid var(--hairline-strong, rgba(255,255,255,.2));
+    border-radius: var(--radius-sm);
+    background: var(--background-tinted-base, rgba(255,255,255,.08));
+    color: var(--color-text-primary);
+    padding: 10px 12px;
+  }
+
+  .sl-font-picker-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 8px;
+    max-height: min(58vh, 580px);
+    overflow: auto;
+  }
+
+  .sl-font-picker-option {
+    display: grid;
+    gap: 7px;
+    text-align: left;
+    padding: 13px;
+    color: var(--color-text-primary);
+    background: var(--background-tinted-base, rgba(255,255,255,.06));
+    border: 1px solid var(--hairline, rgba(255,255,255,.1));
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+  }
+
+  .sl-font-picker-option:hover,
+  .sl-font-picker-option.is-selected {
+    border-color: var(--spice-button-active, #8b73ff);
+    background: var(--accent-tint-bg-hover);
+  }
+
+  .sl-font-picker-option strong { font-size: 1.05rem; }
+  .sl-font-picker-option span { color: var(--color-text-subdued); font-size: .83rem; line-height: 1.35; }
+
+  .sl-us-font-picker { display: flex; gap: 8px; align-items: center; min-width: 0; }
+
   .sl-sp-source-manager {
     display: flex;
     flex-direction: column;

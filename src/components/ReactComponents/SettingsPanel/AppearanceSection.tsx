@@ -18,6 +18,7 @@ import {
 import { matches, Row, SectionTitle, Select, Slider, Toggle } from "./components.tsx";
 import { ExperimentSettings } from "./ExperimentsPanel.tsx";
 import { GOOGLE_FONT_OPTIONS } from "../../../utils/googleFonts.ts";
+import { FontPreviewPicker } from "./FontPreviewPicker.tsx";
 
 const SECTION_NAME = "Appearance";
 const FPS_CAP_DESCRIPTION = "Limit how often lyrics, animated backgrounds, and smooth scrolling redraw. Turn off to redraw on every display refresh.";
@@ -151,14 +152,14 @@ export default function AppearanceSection({ query, sectionFilter, showHidden = f
       )}
 
       {r2a && (
-        <Row label="Google Font" description="Choose a font to load through coolLabs Fonts.">
-          <Select value={GOOGLE_FONT_OPTIONS.includes(customFont as typeof GOOGLE_FONT_OPTIONS[number]) ? customFont : ""} options={["", ...GOOGLE_FONT_OPTIONS]} labels={["Choose a font…", ...GOOGLE_FONT_OPTIONS]} onChange={(value) => $customFont.set(value)} />
+        <Row label="Google Font" description="Browse Google Fonts with live previews. The selected font loads through coolLabs Fonts.">
+          <FontPreviewPicker source="google" value={GOOGLE_FONT_OPTIONS.includes(customFont as typeof GOOGLE_FONT_OPTIONS[number]) ? customFont : ""} onChange={(value) => $customFont.set(value)} />
         </Row>
       )}
 
       {r2b && (
-        <Row label="System Font Name" description="Enter any font family installed on this computer.">
-          <input className="sl-sp-text-input" type="text" placeholder="Spotify Mix" value={customFont} onChange={(e) => $customFont.set(e.currentTarget.value)} spellCheck={false} />
+        <Row label="System Font" description="Browse installed fonts with live previews, or type a family name.">
+          <span className="sl-sp-btn-group"><FontPreviewPicker source="system" value={customFont} onChange={(value) => $customFont.set(value)} /><input className="sl-sp-text-input" type="text" placeholder="Spotify Mix" value={customFont} onChange={(e) => $customFont.set(e.currentTarget.value)} spellCheck={false} /></span>
         </Row>
       )}
 

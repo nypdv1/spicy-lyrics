@@ -633,7 +633,7 @@ let musicVideoRecoveryTimer: ReturnType<typeof setTimeout> | null = null;
 let lastMusicVideoRecovery = 0;
 
 function recoverMissingMusicVideo(page: HTMLElement): void {
-  if (!musicVideoStaged) return;
+  if (!musicVideoStaged || !page.classList.contains("st-mv-active")) return;
   if (page.querySelector("#spicy-themes-mv")) {
     if (musicVideoRecoveryTimer) clearTimeout(musicVideoRecoveryTimer);
     musicVideoRecoveryTimer = null;
@@ -642,11 +642,7 @@ function recoverMissingMusicVideo(page: HTMLElement): void {
   if (musicVideoRecoveryTimer || Date.now() - lastMusicVideoRecovery < 10_000) return;
   musicVideoRecoveryTimer = setTimeout(() => {
     musicVideoRecoveryTimer = null;
-    if (!musicVideoStaged || page.querySelector("#spicy-themes-mv")) return;
-    try {
-      (Spicetify.Player as any).dispatchEvent?.(new Event("songchange"));
-      return;
-    } catch {}
+    if (!musicVideoStaged || !page.classList.contains("st-mv-active") || page.querySelector("#spicy-themes-mv")) return;
     const themes = (window as any).SpicyThemes;
     if (!themes?.getState?.()?.isEnabled || !themes.disable || !themes.enable) return;
     lastMusicVideoRecovery = Date.now();

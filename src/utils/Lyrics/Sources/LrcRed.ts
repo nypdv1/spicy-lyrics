@@ -73,7 +73,16 @@ function addLeadPiece(lead: any[], syllable: any, rawText: string): void {
 function addBackgroundPiece(pieces: any[], syllable: any, rawText: string): void {
   // Brackets and punctuation belong to the main line's grammar, not the ad-lib.
   const text = rawText.replace(/^[\s([{]+|[\s\])}.,;:!?]+$/g, "");
-  if (text) pieces.push({ ...syllable, Text: text, IsPartOfWord: false });
+  // Keep a model's word-continuation timing inside the parenthetical. Previously
+  // every background piece was forced apart here, so `hel` + `lo` could never
+  // render as one background word. The closing bracket always ends that run.
+  if (text) {
+    pieces.push({
+      ...syllable,
+      Text: text,
+      IsPartOfWord: Boolean(syllable.IsPartOfWord) && !rawText.includes(")"),
+    });
+  }
 }
 
 /** Moves every parenthetical model-sync ad-lib into its own background vocal group. */

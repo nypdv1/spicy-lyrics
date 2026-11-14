@@ -116,6 +116,7 @@ import Logger from "./utils/Logger.ts";
 import Whentil from "./modules/Whentil.ts";
 import App from "./utils/app.ts";
 import { toCssFontFamily } from "./utils/cssFontFamily.ts";
+import { loadCoollabsFont } from "./utils/coollabsFonts.ts";
 import { initSession } from "./utils/SessionManager/index.ts";
 import { CheckForUpdates } from "./utils/version/CheckForUpdates.tsx";
 import { jitter } from "./utils/jitter.ts";
@@ -129,6 +130,7 @@ function bindDefault<T>(store: { get: () => T; listen: (listener: (value: T) => 
 
 function applyCustomFont(enabled = $customFontEnabled.get(), font = $customFont.get()) {
   const cssFontFamily = toCssFontFamily(font);
+  loadCoollabsFont(enabled ? font : "");
   if (enabled && cssFontFamily) {
     document.documentElement.style.setProperty("--spicy-custom-font", cssFontFamily);
   } else {

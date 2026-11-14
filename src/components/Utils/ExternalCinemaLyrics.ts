@@ -67,7 +67,7 @@ async function copyLyricsWindowStyles(targetWindow: Window, wrapperClass: string
   Array.from(document.querySelectorAll('link[rel="stylesheet"]')).forEach((link: HTMLLinkElement) => {
     const href = link.getAttribute("href") || "";
     const classList = Array.from(link.classList || []);
-    const isFont = href.startsWith("https://fonts.spikerko.org");
+    const isFont = href.startsWith("https://fonts.spikerko.org") || href.startsWith("https://api.fonts.coollabs.io/");
     const isLocalCss = /^\/[a-zA-Z]{2}.*\.css$/.test(href);
     const isUserCss = (href.endsWith("colors.css") || href.endsWith("user.css")) && classList.length === 1 && classList[0] === "userCSS";
     if (!link.href || (!isFont && !isLocalCss && !isUserCss)) return;

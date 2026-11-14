@@ -16,6 +16,7 @@ import {
 } from "../../../utils/stores.ts";
 import { matches, Row, SectionTitle, Select, Slider, Toggle } from "./components.tsx";
 import { ExperimentSettings } from "./ExperimentsPanel.tsx";
+import { GoogleFontPicker } from "./GoogleFontPicker.tsx";
 
 const SECTION_NAME = "Appearance";
 const FPS_CAP_DESCRIPTION = "Limit how often lyrics, animated backgrounds, and smooth scrolling redraw. Turn off to redraw on every display refresh.";
@@ -56,7 +57,7 @@ export default function AppearanceSection({ query, sectionFilter, showHidden = f
 
   const visible = (id: string) => showHidden ? hiddenSettingIds.includes(id) : !allowHidingSettings || !hiddenSettingIds.includes(id) || Boolean(query.trim());
   const r1 = visible("appearance-custom-font") && matches(query, "Use Custom Font", "Use a custom font instead of the bundled Spicy Lyrics font.");
-  const r2 = visible("appearance-custom-font") && customFontEnabled && matches(query, "Font Name", "Font family name to use for lyrics.");
+  const r2 = visible("appearance-custom-font") && customFontEnabled && matches(query, "Google Font", "Choose a Google Font or enter an installed font family name for lyrics.");
   const r3 = visible("appearance-background-type") && matches(query, "Background Type", "Choose the dynamic, legacy, static image, or color background.");
   const r4 = visible("appearance-npv-background") && matches(query, "Display Dynamic Background in Now Playing View", "Show the animated background in the Now Playing panel.");
   const blurApplies = ["auto", "artistHeader", "coverArt"].includes(staticBackgroundMode);
@@ -134,21 +135,14 @@ export default function AppearanceSection({ query, sectionFilter, showHidden = f
       )}
 
       {r1 && (
-        <Row settingId="appearance-custom-font" label="Use Custom Font" description="Use a custom font instead of the bundled Spicy Lyrics font.">
+        <Row settingId="appearance-custom-font" label="Use Custom Font" description="Use a Google Font or installed font instead of the bundled Spicy Lyrics font.">
           <Toggle checked={customFontEnabled} onChange={(v) => $customFontEnabled.set(v)} />
         </Row>
       )}
 
       {r2 && (
-        <Row label="Font Name" description="Enter the installed font family name to use for lyrics.">
-          <input
-            className="sl-sp-text-input"
-            type="text"
-            placeholder="Spotify Mix"
-            value={customFont}
-            onChange={(e) => $customFont.set(e.currentTarget.value)}
-            spellCheck={false}
-          />
+        <Row label="Google Font" description="Select a suggestion or enter any Google Font family. It loads through coolLabs Fonts; installed font names still work too.">
+          <GoogleFontPicker className="sl-sp-text-input" label="Google Font" value={customFont} onChange={(value) => $customFont.set(value)} />
         </Row>
       )}
 

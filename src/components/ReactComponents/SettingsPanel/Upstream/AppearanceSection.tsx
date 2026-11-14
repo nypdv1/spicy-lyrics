@@ -9,6 +9,7 @@ import {
 } from "../../../../utils/stores.ts";
 import { Slider, Toggle } from "./components.tsx";
 import { AppearanceIcon } from "./icons.tsx";
+import { GoogleFontPicker } from "../GoogleFontPicker.tsx";
 import type { GroupDef, SectionDef } from "./model.ts";
 
 // Built once: the Control components must keep their identity across renders.
@@ -33,7 +34,7 @@ const groups: GroupDef[] = [
       {
         id: "customFontEnabled",
         label: "Use Custom Font",
-        description: "Use an installed font family instead of the bundled Spicy Lyrics font.",
+        description: "Use a Google Font or installed font instead of the bundled Spicy Lyrics font.",
         keywords: "font family typeface",
         Control: ({ label }) => (
           <Toggle label={label} checked={useStore($customFontEnabled)} onChange={(v) => $customFontEnabled.set(v)} />
@@ -41,12 +42,12 @@ const groups: GroupDef[] = [
       },
       {
         id: "customFont",
-        label: "Custom Font Name",
-        description: "The installed font family to use for lyrics.",
-        keywords: "font family typeface",
+        label: "Google Font",
+        description: "Select a Google Font or enter an installed font family. Google Fonts load through coolLabs Fonts.",
+        keywords: "google font family typeface coollabs",
         useDisabled: () => !useStore($customFontEnabled) && "Turn on Use Custom Font to change this.",
         Control: ({ disabled, label }) => (
-          <input className="sl-us-text-input" aria-label={label} disabled={disabled} placeholder="Spotify Mix" value={useStore($customFont)} onChange={(event) => $customFont.set(event.currentTarget.value)} spellCheck={false} />
+          <GoogleFontPicker className="sl-us-text-input" label={label} disabled={disabled} value={useStore($customFont)} onChange={(value) => $customFont.set(value)} />
         ),
       },
       {

@@ -41,6 +41,7 @@ import {
   $customFontEnabled,
   $enableExperimentalWordSync,
   $duetLinePadding,
+  $staticSyncTarget,
   $lineHoverBackground,
   $memeFormat,
   $lyricsContainerExists,
@@ -1219,6 +1220,12 @@ $syllablePace.listen(rebuildLyrics);
 // Rows under each line are built with romanization off too, so the toggle can
 // open them in place; switching to or from them always renders again.
 $romanizationDisplay.listen(rebuildLyrics);
+// Only unsynced lyrics change, and only while word sync is on.
+$staticSyncTarget.listen(() => {
+  if (!PageContainer || !$enableExperimentalWordSync.get()) return;
+  ReapplyCurrentLyrics();
+});
+
 
 // Synchronous, so romanizedRowsToggled sees the rows change inside its flip.
 $romanization.listen((v) => {

@@ -1,9 +1,5 @@
 import { getDynamicAudioAnalysis } from "../audioAnalysis.ts";
-import {
-  DecodeVocalActivity,
-  FetchMetadataExtension,
-  MetadataExtension,
-} from "../API/SpotifyMetadata.ts";
+import { GetVocalCurve } from "../Lyrics/VocalCurve.ts";
 import type { StaticAutoScroll } from "../stores.ts";
 import Logger from "../Logger.ts";
 
@@ -15,11 +11,6 @@ const logger = new Logger("Static Pace");
  */
 export type StaticPace = (positionMs: number) => number;
 
-// Below this the voice detector is reading instruments (they sit around 15).
-const VOCAL_FLOOR = 30;
-const VOCAL_FULL = 70;
-// A song with less detected singing than this is treated as having no vocal data.
-const MIN_SUNG_SECONDS = 10;
 // Quieter than this counts as silence.
 const SILENCE_DB = -35;
 // Quiet stretches shorter than this are pauses inside the music, not breaks.
@@ -46,16 +37,9 @@ function paceFromWeights(
 
 /** Moves while someone is singing, by the client's voice detection. */
 async function vocalPace(uri: string): Promise<StaticPace | null> {
-  if (!uri.startsWith("spotify:track:")) return null;
-  const bytes = await FetchMetadataExtension(uri, MetadataExtension.VocalActivity);
-  const vocals = bytes && DecodeVocalActivity(bytes);
-  if (!vocals) return null;
-  const weights = vocals.probabilities.map((p) =>
-    Math.min(Math.max((p - VOCAL_FLOOR) / (VOCAL_FULL - VOCAL_FLOOR), 0), 1)
-  );
-  const sung = weights.reduce((a, b) => a + b, 0) / vocals.rate;
-  if (sung < MIN_SUNG_SECONDS) return null;
-  return paceFromWeights(vocals.offset, vocals.rate, weights);
+  const curve = await GetVocalCurve(uri);
+  if (!curve) return null;
+  return (positionMs) => curve.sungAt(positionMs / 1000) / curve.total;
 }
 
 /** Moves while the song isn't silent: skips quiet intros, outros and breaks of a few seconds. */

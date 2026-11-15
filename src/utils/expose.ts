@@ -9,10 +9,11 @@ import { BreakerDebug } from "./API/CircuitBreaker";
 import { RemoteConfigDebug } from "./remoteConfig";
 import { showUpdatedDialog } from "../components/ReactComponents/UpdateDialog.tsx";
 import GetProgress from "./Gets/GetProgress";
-import ApplyLyrics from "./Lyrics/Global/Applyer.ts";
+import ApplyLyrics, { GetLastWordSync } from "./Lyrics/Global/Applyer.ts";
 import { SpotifyPlayer } from "../components/Global/SpotifyPlayer.ts";
 import { getBackgroundMotionState } from "../components/DynamicBG/dynamicBackground.ts";
 import { ForceNextUp } from "../components/Utils/NextUp.ts";
+import { GetVocalCurve } from "./Lyrics/VocalCurve.ts";
 
 export function exposeToWindow() {
     const api = {
@@ -51,6 +52,10 @@ export function exposeToWindow() {
             // Paint a notice over the current track, e.g. showLyricsNotice("status-not-200", 500).
             showLyricsNotice: (descriptor: string, status: number = 0) =>
                 ApplyLyrics([descriptor, status, SpotifyPlayer.GetUri()]),
+            // The singing curve word sync goes by, e.g. vocalCurve() for the current track.
+            vocalCurve: (uri: string = SpotifyPlayer.GetUri() ?? "") => GetVocalCurve(uri),
+            // What Experimental Word Sync did on the last apply: source type, timing used, voice data.
+            wordSync: () => GetLastWordSync(),
         },
         request: {
             QueryAPI: {

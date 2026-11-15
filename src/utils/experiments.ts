@@ -262,6 +262,15 @@ export const EXPERIMENTS = [
     default: true,
     pageClass: "Exp_GroupedViewControls",
   },
+  {
+    id: "vocalWordSync",
+    category: "lyrics",
+    label: "Vocal Word Sync",
+    description:
+      "Experimental Word Sync goes by where Spotify hears singing: each line ends where its singing stops, and unsynced lyrics are placed on the singing instead of spread over the whole song. Songs without voice data use the old estimate. Disable to always use the old estimate.",
+    default: true,
+    rebuildsLyrics: true,
+  },
 ] as const satisfies readonly Experiment[];
 
 /** A registry entry, narrowed to its literal `id`. */

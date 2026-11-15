@@ -47,11 +47,12 @@ export function ApplyLyricsProvider(data: any, LyricsContainer: HTMLElement): vo
     providerLabel === "Apple Music" && data.experimentalAppleWordSplitting;
   const experimentalWordSyncHelp =
     data.experimentalWordSync && data.experimentalWordSyncReason !== "SpaceGravity";
+  const estimatedLineSyncHelp = data.experimentalLineSync;
   CreditsRow(ProviderElement, "Provided by", `${providerLabel}${
     experimentalWordSplittingHelp
       ? " (+ extra splits)"
       : ""
-  }${experimentalWordSyncHelp ? " (+ automatic experimental splitting)" : ""}`);
+  }${experimentalWordSyncHelp ? " (+ automatic experimental splitting)" : ""}${estimatedLineSyncHelp ? " (+ estimated line timing)" : ""}`);
 
   const via = typeof data.source_via === "string" && Object.hasOwn(ViaMap, data.source_via)
     ? ViaMap[data.source_via]

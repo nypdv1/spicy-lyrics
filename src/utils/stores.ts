@@ -346,6 +346,9 @@ export const $showVolumeSlider = persistAtom<boolean>("showVolumeSlider", false)
 // The album's animated cover, played over the still one when it has one.
 export const $motionArtwork = persistAtom<boolean>("motionArtwork", true);
 // With Canvas Stage on, what plays when a song has both a Canvas and motion artwork.
+// What Experimental Word Sync makes of unsynced lyrics: estimated word timing, or line timing only.
+export type StaticSyncTarget = "word" | "line";
+export const $staticSyncTarget = persistAtom<StaticSyncTarget>("staticSyncTarget", "word");
 export type MotionArtworkPriority = "motion" | "canvas";
 export const $motionArtworkPriority = persistAtom<MotionArtworkPriority>("motionArtworkPriority", "motion");
 // Motion artwork may fill the Canvas Stage (while Canvas Stage is on); off keeps it on the NowBar cover.

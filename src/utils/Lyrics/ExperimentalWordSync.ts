@@ -4,6 +4,8 @@ import type {
   Segment as AudioSegment,
 } from "../../components/DynamicBG/BackgroundAnimationController.ts";
 import { getCjkSegmentationLocale } from "./Cjk.ts";
+import { AlignLinesToVocals } from "./VocalAlignment.ts";
+import type { VocalCurve } from "./VocalCurve.ts";
 
 type LineLyricsEntry = {
   Type?: "Vocal" | string;
@@ -865,12 +867,21 @@ function getEffectiveLineEnd(
   analysis?: AudioAnalysisData,
   options?: {
     hasBackgroundSegments?: boolean;
+    curve?: VocalCurve | null;
   }
 ): number {
   const lineStart = Number.isFinite(line.StartTime) ? (line.StartTime as number) : 0;
   const rawLineEnd = Number.isFinite(line.EndTime)
     ? Math.max(lineStart, line.EndTime as number)
     : lineStart;
+
+  if (options?.curve) {
+    const estimatedEnd = getEffectiveLineEnd(lines, index, line, analysis, {
+      ...options,
+      curve: null,
+    });
+    return getVocalLineEnd(line.Text, lineStart, rawLineEnd, estimatedEnd, options.curve);
+  }
   const nextLineStart = getSafeLineStartTime(lines[index + 1]);
 
   if (nextLineStart === null) {
@@ -914,6 +925,43 @@ function getEffectiveLineEnd(
   );
 
   return audioAssistedLineEnd ?? estimatedLineEnd;
+}
+
+// A line takes about this many times its spoken length to sing.
+const SUNG_LINE_STRETCH = 1.4;
+// How strongly a pause pulls the line end onto it, per second of pause (capped).
+const LINE_END_PAUSE_PULL = 2;
+const LINE_END_PAUSE_CAP = 1.5;
+
+/**
+ * Where a timed line's singing stops: the pause in `[lineStart, rawLineEnd]` that
+ * best fits how long the text takes to sing, or `estimatedEnd` when none fits
+ * better. Longer pauses fit more readily.
+ */
+function getVocalLineEnd(
+  text: string,
+  lineStart: number,
+  rawLineEnd: number,
+  estimatedEnd: number,
+  curve: VocalCurve
+): number {
+  const expected = getBaseSpokenLineDuration(text) * SUNG_LINE_STRETCH;
+  const minimumEnd = lineStart + Math.max(0.3, splitWords(text).length * 0.09);
+  const misfit = (end: number) => Math.abs(Math.log(Math.max(end - lineStart, 0.05) / expected));
+
+  let best = estimatedEnd;
+  let bestScore = misfit(estimatedEnd);
+  for (const pause of curve.pauses) {
+    if (pause.start >= rawLineEnd - 0.05) break;
+    if (pause.start <= minimumEnd) continue;
+    const length = Math.min(pause.end, rawLineEnd) - pause.start;
+    const score = misfit(pause.start) - LINE_END_PAUSE_PULL * Math.min(length, LINE_END_PAUSE_CAP);
+    if (score < bestScore) {
+      bestScore = score;
+      best = pause.start;
+    }
+  }
+  return Math.min(rawLineEnd, Math.max(best, minimumEnd));
 }
 
 function getPreparedStaticLines(lines: StaticLyricsEntry[]): PreparedStaticLine[] {
@@ -1014,12 +1062,55 @@ function getStaticLyricsTimingWindow(
   return { start, end };
 }
 
+/** Static lines placed on the singing, or null when they can't be fitted to it. */
+function buildVocalStaticLineLyrics(lyrics: any, curve: VocalCurve) {
+  const preparedLines = getPreparedStaticLines(lyrics.Lines as StaticLyricsEntry[]);
+  if (!preparedLines.length) return null;
+
+  const aligned = AlignLinesToVocals(
+    preparedLines.map((entry) => getEstimatedStaticLineDuration(entry.line.Text)),
+    preparedLines.map((_, index) => (preparedLines[index + 1]?.blankLinesBefore ?? 0) > 0),
+    curve
+  );
+  if (!aligned) return null;
+
+  const syntheticLines: LineLyricsEntry[] = preparedLines.map((entry, index) => {
+    const minimumLineDuration = Math.max(0.34, splitWords(entry.line.Text).length * 0.09);
+    return {
+      Type: "Vocal",
+      Text: entry.line.Text,
+      TransliteratedText: entry.line.TransliteratedText,
+      GibberishText: entry.line.GibberishText,
+      OppositeAligned: entry.line.OppositeAligned,
+      StartTime: aligned[index].start,
+      EndTime: Math.max(aligned[index].end, aligned[index].start + minimumLineDuration),
+    };
+  });
+
+  return {
+    ...lyrics,
+    Type: "Line",
+    Content: syntheticLines,
+    experimentalWordSyncTiming: "vocals",
+  };
+}
+
 function buildStaticSyntheticLineLyrics(
   lyrics: any,
   analysis?: AudioAnalysisData | null,
-  fallbackDurationSeconds?: number
+  fallbackDurationSeconds?: number,
+  curve?: VocalCurve | null
 ) {
-  if (lyrics?.Type !== "Static" || !Array.isArray(lyrics.Lines) || !analysis) {
+  if (lyrics?.Type !== "Static" || !Array.isArray(lyrics.Lines)) {
+    return null;
+  }
+
+  if (curve) {
+    const vocalLyrics = buildVocalStaticLineLyrics(lyrics, curve);
+    if (vocalLyrics) return vocalLyrics;
+  }
+
+  if (!analysis) {
     return null;
   }
 
@@ -1124,12 +1215,19 @@ function buildStaticSyntheticLineLyrics(
     ...lyrics,
     Type: "Line",
     Content: syntheticLines,
+    experimentalWordSyncTiming: "estimate",
   };
 }
 
+/**
+ * Word timing for line-synced lyrics. Words split each line by length. With a
+ * vocal curve, a line ends on the pause in its singing that best fits its text;
+ * without one, the end comes from the text alone.
+ */
 export function ConvertLineLyricsToExperimentalWordSync(
   lyrics: any,
-  analysis?: AudioAnalysisData | null
+  analysis?: AudioAnalysisData | null,
+  curve?: VocalCurve | null
 ) {
   if (lyrics?.Type !== "Line" || !Array.isArray(lyrics.Content)) {
     return lyrics;
@@ -1160,6 +1258,7 @@ export function ConvertLineLyricsToExperimentalWordSync(
       analysis ?? undefined,
       {
         hasBackgroundSegments,
+        curve,
       }
     );
 
@@ -1286,18 +1385,55 @@ export function ConvertLineLyricsToExperimentalWordSync(
     Content: convertedContent,
     experimentalWordSync: true,
     experimentalWordSyncSource: lyrics.experimentalWordSyncSource ?? "Line",
+    // "vocals" when the timing came from the voice data, "estimate" otherwise.
+    experimentalWordSyncTiming: lyrics.experimentalWordSyncTiming ?? (curve ? "vocals" : "estimate"),
   };
 }
 
-export function ConvertStaticLyricsToExperimentalWordSync(
+/**
+ * Line timing for unsynced lyrics, without splitting words. Placed the same way
+ * as for word timing; the lyrics come back unchanged when they can't be timed.
+ */
+export function ConvertStaticLyricsToEstimatedLines(
   lyrics: any,
   analysis?: AudioAnalysisData | null,
-  fallbackDurationSeconds?: number
+  fallbackDurationSeconds?: number,
+  curve?: VocalCurve | null
 ) {
   const syntheticLineLyrics = buildStaticSyntheticLineLyrics(
     lyrics,
     analysis,
-    fallbackDurationSeconds
+    fallbackDurationSeconds,
+    curve
+  );
+
+  if (!syntheticLineLyrics) {
+    return lyrics;
+  }
+
+  return {
+    ...syntheticLineLyrics,
+    experimentalLineSync: true,
+    experimentalWordSyncSource: "Static",
+  };
+}
+
+/**
+ * Word timing for unsynced lyrics. With a vocal curve, lines are placed on the
+ * singing (VocalAlignment.ts); without one, they're spread over the song between
+ * an estimated intro and outro.
+ */
+export function ConvertStaticLyricsToExperimentalWordSync(
+  lyrics: any,
+  analysis?: AudioAnalysisData | null,
+  fallbackDurationSeconds?: number,
+  curve?: VocalCurve | null
+) {
+  const syntheticLineLyrics = buildStaticSyntheticLineLyrics(
+    lyrics,
+    analysis,
+    fallbackDurationSeconds,
+    curve
   );
 
   if (!syntheticLineLyrics) {

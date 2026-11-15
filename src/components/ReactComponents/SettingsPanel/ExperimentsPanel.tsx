@@ -1,10 +1,10 @@
 import { useStore } from "@nanostores/react";
 import { $experiment, EXPERIMENT_CATEGORIES, $experimentOverrides, $experimentsSyncing, forcedExperimentState, getAdvancedExperiments, getVisibleExperiments, RefreshExperimentOverrides, setExperiment, type ExperimentId, type ResolvedExperiment } from "../../../utils/experiments.ts";
 import { useEffect } from "react";
-import { $enableExperimentalWordSync, $externalCinemaLyricsAllowed, $staticBackgroundMode } from "../../../utils/stores.ts";
+import { $enableExperimentalWordSync, $externalCinemaLyricsAllowed, $staticBackgroundMode, $staticSyncTarget, type StaticSyncTarget } from "../../../utils/stores.ts";
 import { canvasStageBackgroundNote } from "./AppearanceSection.tsx";
 import { $ttmlReviewer, REVIEWER_LOCK_REASON } from "../../../utils/ttmlReviewer.ts";
-import { Row, SectionTitle, Toggle } from "./components.tsx";
+import { Row, Select, SectionTitle, Toggle } from "./components.tsx";
 
 const experimentSettingIds: Partial<Record<ExperimentId, string>> = {
   newSettingsDesign: "appearance-settings-design",
@@ -27,6 +27,7 @@ export function ExperimentSettings({ title = false, experimentIds, advancedOnly 
   useStore($experimentOverrides);
   useEffect(() => { void RefreshExperimentOverrides(); }, []);
   const experimentalWordSync = useStore($enableExperimentalWordSync);
+  const staticSyncTarget = useStore($staticSyncTarget);
   const externalCinemaLyricsAllowed = useStore($externalCinemaLyricsAllowed);
   const experiments = advancedOnly ? getAdvancedExperiments() : getVisibleExperiments();
 
@@ -65,6 +66,9 @@ export function ExperimentSettings({ title = false, experimentIds, advancedOnly 
       </Row>
       <Row label="Experimental Word Sync" description="Estimate word sync for line or static lyrics.">
         <Toggle checked={experimentalWordSync} onChange={(v) => $enableExperimentalWordSync.set(v)} />
+      </Row>
+      <Row label="Unsynced Lyrics Sync" description="What Experimental Word Sync estimates for lyrics without timing: word by word, or whole lines only. Space Gravity always uses words." disabled={!experimentalWordSync} disabledReason="Turn on Experimental Word Sync to change this.">
+        <Select value={staticSyncTarget} options={["word", "line"]} labels={["Words", "Lines"]} onChange={(v) => $staticSyncTarget.set(v as StaticSyncTarget)} disabled={!experimentalWordSync} />
       </Row></>}
     </>
   );

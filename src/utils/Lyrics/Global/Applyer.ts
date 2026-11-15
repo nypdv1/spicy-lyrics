@@ -1,6 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 
-import { $currentLyricsData, $currentLyricsType, $customFont, $customFontEnabled, $spaceGravityMode } from "../../stores.ts";
+import { $currentLyricsData, $currentLyricsType, $customFont, $customFontEnabled, $spaceGravityMode, $staticSyncTarget } from "../../stores.ts";
 import { ClearScrollSimplebar } from "../../Scrolling/Simplebar/ScrollSimplebar.ts";
 import { setBlurringLastLine } from "../Animator/Lyrics/LyricsAnimator.ts";
 import { DestroyAllLyricsContainers } from "../Applyer/CreateLyricsContainer.ts";
@@ -10,10 +10,13 @@ import { ApplyLineLyrics } from "../Applyer/Synced/Line.ts";
 import { ApplySyllableLyrics, ClearSyllableRenderSession } from "../Applyer/Synced/Syllable.ts";
 import {
   ConvertLineLyricsToExperimentalWordSync,
+  ConvertStaticLyricsToEstimatedLines,
   ConvertStaticLyricsToExperimentalWordSync,
   SplitAppleMusicSyllableWords,
 } from "../ExperimentalWordSync.ts";
 import { getDynamicAudioAnalysis } from "../../audioAnalysis.ts";
+import { isExperimentEnabled } from "../../experiments.ts";
+import { GetVocalCurve } from "../VocalCurve.ts";
 import fetchLyrics, { ClearLyricsPageContainer, getSongKey } from "../fetchLyrics.ts";
 import { BuildLyricsNotice, HasNotice, SetShownNotice, SyncNoLyricsLayout } from "../LyricsNotice.ts";
 import { ClearLyricsContentArrays, isRomanized, LyricsObject, setRomanizedStatus } from "../lyrics.ts";
@@ -53,6 +56,10 @@ let currentAbortController: AbortController | null = null;
 let appliedLyricsIdentity: string | null = null;
 let renderedLyrics: LyricsData | null = null;
 let applyGeneration = 0;
+
+/** What Experimental Word Sync did on the last apply, for the debug surface. */
+let lastWordSync: Record<string, unknown> | null = null;
+export const GetLastWordSync = () => lastWordSync;
 let fontCheckGeneration = 0;
 const watchedFontDocuments = new WeakSet<Document>();
 
@@ -230,9 +237,15 @@ export default async function ApplyLyrics(lyricsContent: [object | string, numbe
         typeof lyrics.id === "string" && lyrics.id.length > 0
           ? lyrics.id
           : SpotifyPlayer.GetId() ?? "";
-      const audioAnalysis = analysisTrackId
-        ? await getDynamicAudioAnalysis(analysisTrackId)
-        : null;
+      const [audioAnalysis, vocalCurve] = await Promise.all([
+        // The loader takes a URI; a bare track id never loaded anything.
+        analysisTrackId
+          ? getDynamicAudioAnalysis(
+              analysisTrackId.includes(":") ? analysisTrackId : `spotify:track:${analysisTrackId}`
+            )
+          : null,
+        uri && isExperimentEnabled("vocalWordSync") ? GetVocalCurve(uri) : null,
+      ]);
 
       // Keep current lyrics mounted while analysis loads. A newer apply owns the
       // page, and a Gravity toggle may have removed its temporary requirement.
@@ -242,14 +255,35 @@ export default async function ApplyLyrics(lyricsContent: [object | string, numbe
         !Defaults.EnableExperimentalWordSync && $spaceGravityMode.get();
       if (Defaults.EnableExperimentalWordSync || forceWordSyncForSpaceGravity) {
         if (lyrics.Type === "Line") {
-          lyrics = ConvertLineLyricsToExperimentalWordSync(lyrics, audioAnalysis) as LyricsData;
+          lyrics = ConvertLineLyricsToExperimentalWordSync(lyrics, audioAnalysis, vocalCurve) as LyricsData;
+        } else if ($staticSyncTarget.get() === "line" && !forceWordSyncForSpaceGravity) {
+          // Space Gravity needs words, so it always gets word timing.
+          lyrics = ConvertStaticLyricsToEstimatedLines(
+            lyrics,
+            audioAnalysis,
+            SpotifyPlayer.GetDuration() / 1000,
+            vocalCurve
+          ) as LyricsData;
         } else {
           lyrics = ConvertStaticLyricsToExperimentalWordSync(
             lyrics,
             audioAnalysis,
-            SpotifyPlayer.GetDuration() / 1000
+            SpotifyPlayer.GetDuration() / 1000,
+            vocalCurve
           ) as LyricsData;
         }
+
+        lastWordSync = {
+          uri,
+          from: (descriptor as LyricsData).Type,
+          converted: !!(lyrics.experimentalWordSync || lyrics.experimentalLineSync),
+          to: lyrics.Type,
+          timing: lyrics.experimentalWordSyncTiming ?? null,
+          vocalExperiment: isExperimentEnabled("vocalWordSync"),
+          voiceData: vocalCurve ? { sungSeconds: Math.round(vocalCurve.total), pauses: vocalCurve.pauses.length } : null,
+          lyrics,
+        };
+        console.debug("[Spicy Lyrics] Word sync:", (descriptor as LyricsData).Type, "→", lyrics.experimentalWordSyncTiming ?? "unchanged", vocalCurve ? "(voice data)" : "(no voice data)");
 
         if (forceWordSyncForSpaceGravity && lyrics.experimentalWordSync) {
           lyrics.experimentalWordSyncReason = "SpaceGravity";

@@ -2,8 +2,8 @@
 
 # Spicy Lyrics Fork
 
-> **This is an unofficial development build of Spicy Lyrics**, maintained by nypd / iPixelGalaxy — a derivative of [LyssLabs/lyssna-lyrics](https://github.com/LyssLabs/lyssna-lyrics) (pixel fork).
-> It runs alongside the official version and gives you access to experimental features and tweaks before they ship to stable.
+> **This is an unofficial fork build of Spicy Lyrics**, — a derivative of [LyssLabs/lyssna-lyrics](https://github.com/LyssLabs/lyssna-lyrics) (pixel fork).
+> Install it if ur niche
 
 ---
 
@@ -21,18 +21,10 @@ If you have Spicy Lyrics installed from the **Spicetify Marketplace**, uninstall
 
 ---
 
-### Step 2 — Install this build manually
+### Step 2 — Install via builds.tx24.dev
 
 1. Make sure [Spicetify](https://spicetify.app) is installed
-2. Download the extension entrypoint from `https://fork.rmmreviv.al/spicy-lyrics.mjs` (or `https://fork.nypd594.workers.dev/spicy-lyrics.mjs`)
-3. Move the file into your Spicetify Extensions directory
-   - Find the correct path here: [spicetify.app — Manual Installation](https://spicetify.app/docs/customization/extensions#manual-installation)
-   - Or run `spicetify config-dir` to open the path
-4. Run the following commands in your terminal:
-   ```
-   spicetify config extensions spicy-lyrics.mjs
-   spicetify apply
-   ```
+2. Follow the installation instructions at **[https://builds.tx24.dev/](https://builds.tx24.dev/)** (or download the `entrypoint.mjs` extension from `https://builds.tx24.dev/entrypoint.mjs` into your Spicetify Extensions directory and run `spicetify config extensions entrypoint.mjs` + `spicetify apply`)
 
 ---
 

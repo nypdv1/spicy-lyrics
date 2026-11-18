@@ -174,7 +174,10 @@ _v6_b/
 
 src/components/cli-sync
 
-.claude/settings.local.json
+.claude/
+.agents/
+CLAUDE.md
+*.bundle
 
 CHANGELOG.md
 

@@ -2,7 +2,7 @@
 
 # Spicy Lyrics Fork
 
-> **This is an unofficial development build of Spicy Lyrics**, maintained by nypd / iPixelGalaxy.
+> **This is an unofficial development build of Spicy Lyrics**, maintained by nypd / iPixelGalaxy — a derivative of [LyssLabs/lyssna-lyrics](https://github.com/LyssLabs/lyssna-lyrics) (pixel fork).
 > It runs alongside the official version and gives you access to experimental features and tweaks before they ship to stable.
 
 ---

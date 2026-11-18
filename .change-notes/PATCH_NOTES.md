@@ -64,7 +64,15 @@
 
 ## v0.1.0.242
 
-- **Initial `0.1.0.x` fork build**: Rebased fork onto `6.5.0+` with `0.1.0.x` versioning and worker deployment.
+- **Initial `0.1.0.x` fork build**: Switched from `100.10.x-sync` to `0.1.0.x` versioning with worker deployment.
+
+## v100.10.133-sync – v100.10.241-sync
+
+- **Upstream 6.5.0+ sync & word-sync**: Merged upstream `6.5.0`, added `lrc.red` lyrics source & model sync, and added Spotify voice-detection word-sync timing.
+- **Vocal stutter repair & replay**: Added vocal stutter word-sync repair, leading/suffix dash handling, and per-cue replay animations across simple and Bloom renderers.
+- **Canvas Stage & music videos**: Added Spicy Themes music video playback on the Canvas Stage, transparent background support, and smoother NowBar/Canvas handoffs.
+- **Settings & font picker**: Added selectable upstream settings layout with pinned subcategory navigation, previewable Google/coolLabs & system font picker, and adjustable Long Word Minimum threshold.
+- **Popup mini player & Smooth Scrolling**: Restored classic popup mini player layout and sizing, and reduced per-frame layout work in Smooth Scrolling.
 
 ## v100.10.54
 

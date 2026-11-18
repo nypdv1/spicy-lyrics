@@ -50,9 +50,13 @@ This build is designed to **coexist with the official Spicy Lyrics release**. If
 
 ---
 
-> Features here may be unstable, incomplete, or subject to change before reaching the official release (if ever 💀, lowkey, this is just my playground).
+> Features here may be (are) unstable, incomplete, or subject to change ().
 
 ## What's New
+
+## v0.1.0.259
+
+- **Grouped view controls hover fade**: Fixed the pill's icons disappearing immediately on hover-off while the empty pill lingered; the capsule and its icons now fade in and out together.
 
 ## v0.1.0.258
 

@@ -1,3 +1,7 @@
+## v0.1.0.259
+
+- **Grouped view controls hover fade**: Fixed the pill's icons disappearing immediately on hover-off while the empty pill lingered; the capsule and its icons now fade in and out together.
+
 ## v0.1.0.258
 
 - **Patch notes support for fork releases**: Updated the in-app Patch Notes dialog and links to point to `nypdv1/spicy-lyrics` and parse 4-part `0.1.0.x` versions.
@@ -65,6 +69,10 @@
 ## v0.1.0.242
 
 - **Initial `0.1.0.x` fork build**: Switched from `100.10.x-sync` to `0.1.0.x` versioning with worker deployment and `6.5.0+` upstream sync.
+
+## v0.1.0.259
+
+- **Grouped view controls hover fade**: Fixed the pill's icons disappearing immediately on hover-off while the empty pill lingered; the capsule and its icons now fade in and out together.
 
 ## v0.1.0.258
 

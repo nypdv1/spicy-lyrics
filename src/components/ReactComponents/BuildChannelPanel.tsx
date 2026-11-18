@@ -74,8 +74,11 @@ function isBuiltInChannel(name: string): boolean {
   return Object.prototype.hasOwnProperty.call(BUILT_IN_CHANNELS, name);
 }
 
-/** Compact setting control shared by Advanced settings and the channel panel. */
-export function BuildChannelSettingControl({ onManage }: { onManage: () => void }) {
+/**
+ * The saved channels and which one is in use. Choosing one reloads Spotify, since the
+ * build is picked at startup. Shared by both settings layouts.
+ */
+export function useBuildChannelChoice() {
   const buildChannel = useStore($buildChannel);
   const [channelMap, setChannelMap] = useState<ChannelMap>(() => ({
     ...BUILT_IN_CHANNELS,
@@ -90,24 +93,31 @@ export function BuildChannelSettingControl({ onManage }: { onManage: () => void 
     return () => window.removeEventListener(CHANNELS_CHANGED_EVENT, refresh);
   }, []);
   const persistedChannel = getInitialChannel(buildChannel);
-  const selectedChannel = channelMap[persistedChannel] ? persistedChannel : "Stable";
+  const selected = channelMap[persistedChannel] ? persistedChannel : "Stable";
+  const select = (channel: string) => {
+    persistBuildChannel(channel);
+    window.location.reload();
+  };
+  return { channels: Object.keys(channelMap), selected, select };
+}
+
+/** Compact setting control shared by Advanced settings and the channel panel. */
+export function BuildChannelSettingControl({ onManage }: { onManage: () => void }) {
+  const { channels, selected: selectedChannel, select } = useBuildChannelChoice();
 
   return (
     <div className="sl-sp-btn-group">
       <span className="sl-sp-select-wrap">
         <span className="sl-sp-select-sizer" aria-hidden="true">
-          {Object.keys(channelMap).map((channelName) => <span key={channelName}>{channelName}</span>)}
+          {channels.map((channelName) => <span key={channelName}>{channelName}</span>)}
         </span>
         <select
           className="sl-sp-select"
           aria-label="Build Channel"
           value={selectedChannel}
-          onChange={(event) => {
-            persistBuildChannel(event.currentTarget.value);
-            window.location.reload();
-          }}
+          onChange={(event) => select(event.currentTarget.value)}
         >
-          {Object.keys(channelMap).map((channelName) => (
+          {channels.map((channelName) => (
             <option key={channelName} value={channelName}>{channelName}</option>
           ))}
         </select>

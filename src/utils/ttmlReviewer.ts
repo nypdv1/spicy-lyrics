@@ -35,6 +35,7 @@ export const REVIEWER_SETTINGS: readonly { key: string; value: unknown; shown: s
   { key: "syllableMerge", value: "off", shown: "Off" },
   { key: "lineHoverBackground", value: true, shown: "On" },
   { key: "duetLinePadding", value: true, shown: "On" },
+  { key: "centerLyrics", value: false, shown: "Off" },
   { key: "creditsFollowLastLine", value: false, shown: "Off" },
   { key: "skipSpicyFont", value: false, shown: "Off" },
   { key: "customFontEnabled", value: false, shown: "Off" },

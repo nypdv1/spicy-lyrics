@@ -4,6 +4,8 @@ import { isCurrentTrack } from "./Sources/Track.ts";
 import { IsLyricsSkeletonEnabled } from "./LyricsSkeleton.ts";
 import { onExperimentChange } from "../experiments.ts";
 import { getRemoteConfig } from "../remoteConfig.ts";
+import { PopupShowsCover } from "./LyricsNotice.ts";
+import { ClearDockCredits } from "./Applyer/Credits/DockCredits.ts";
 
 export const LYRICS_QUEUE_MESSAGE = "Waiting for lyrics. Retrying automatically.";
 const DEFAULT_LABEL = "Loading Lyrics";
@@ -94,11 +96,12 @@ export function ShowLoaderContainer(uri: string): void {
   }
   ownerUri = uri;
   ownerContainer = container;
-  container.classList.remove("Hidden");
+  if (!PopupShowsCover()) container.classList.remove("Hidden");
   container.classList.add("LoadingLyrics");
   container.querySelector(".LyricsContent")?.setAttribute("aria-busy", "true");
   container.querySelector(".LyricsPinnedFooter")?.replaceChildren();
-  PageContainer?.querySelector(".ContentBox")?.classList.remove("LyricsHidden");
+  ClearDockCredits();
+  if (!PopupShowsCover()) PageContainer?.querySelector(".ContentBox")?.classList.remove("LyricsHidden");
   showPresentation();
 }
 

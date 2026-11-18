@@ -9,6 +9,7 @@ import {
   $nowBarForMovingArtwork,
   $releaseYearPosition,
   $showVolumeSlider,
+  $canvasOnStage,
 } from "../../utils/stores.ts";
 import Defaults from "../Global/Defaults.ts";
 import { GetReleaseYear, PeekReleaseYear, type ReleaseYearQuery } from "../../utils/releaseYear.ts";
@@ -1508,7 +1509,7 @@ function songHasMovingArtwork(): boolean | "pending" {
   // A live Spicy Themes player claims the NowBar. Its native stage owns the video itself.
   if (PageContainer?.querySelector("#spicy-themes-mv")?.firstElementChild) return true;
   // A Canvas plays on the stage, which needs the dynamic background.
-  if (isExperimentEnabled("canvasImmersive") && ["dynamic", "none"].includes($backgroundStyle.get()) && GetPlayingCanvasInfo()) {
+  if (isExperimentEnabled("canvasImmersive") && $canvasOnStage.get() && ["dynamic", "none"].includes($backgroundStyle.get()) && GetPlayingCanvasInfo()) {
     return true;
   }
   if (!IsMotionArtworkEnabled()) return false;

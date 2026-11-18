@@ -210,6 +210,15 @@ body:has(.Root:not(.global-nav)) #SpicyLyricsPage .LyricsContainer .LyricsConten
   /* height set dynamically via JS by the virtualizer */
 }
 
+#SpicyLyricsPage .LyricsContainer .LyricsContent .SpicyLyricsScrollContainer .VirtualLyricsContainer[data-motion-blur="smooth"] {
+  filter: blur(var(--sl-scroll-blur));
+  will-change: filter;
+}
+
+#SpicyLyricsPage .LyricsContainer .LyricsContent .SpicyLyricsScrollContainer .VirtualLyricsContainer[data-motion-blur="directional"] {
+  filter: url(#sl-scroll-motion-blur);
+}
+
 /* With position:absolute, CSS margins don't collapse between siblings.
    Clear them here — TanStack Virtual's gap option provides equivalent spacing.
    Specificity (1,6,0) beats Mixed.css rules at (1,5,0) that are loaded after this file. */

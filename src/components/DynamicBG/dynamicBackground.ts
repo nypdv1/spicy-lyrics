@@ -1,7 +1,10 @@
 import {
   $backgroundBlur,
   $backgroundStyle,
+  $beatSyncBackground,
+  $rendererVisualStyle,
   BACKGROUND_STYLES,
+  isLyricVideoRenderer,
   type BackgroundStyle,
 } from "../../utils/stores.ts";
 import { isExperimentEnabled } from "../../utils/experiments.ts";
@@ -43,6 +46,7 @@ const animSpeedController = new BackgroundAnimationController();
 const isRefined = () => isExperimentEnabled("refinedBackground");
 
 export function getBackgroundStyle(): BackgroundStyle {
+  if (isLyricVideoRenderer()) return "dynamic";
   const style = $backgroundStyle.get();
   return BACKGROUND_STYLES.includes(style) ? style : "dynamic";
 }
@@ -96,6 +100,8 @@ function startKawarp(kawarp: Kawarp, canvas: HTMLElement, key: HTMLElement | str
       return;
     }
     if (kawarp.scale !== motionClock.scale) kawarp.scale = motionClock.scale;
+    if (kawarp.saturation !== motionClock.saturation) kawarp.saturation = motionClock.saturation;
+    if (kawarp.warpIntensity !== motionClock.warpIntensity) kawarp.warpIntensity = motionClock.warpIntensity;
     kawarp.renderFrame(motionClock.time);
   }, targetWindow);
 }
@@ -146,6 +152,8 @@ function handOverClock(toMotion: boolean) {
     clock.accumulatedTime = motionClock.time;
     clock.lastFrameTime = performance.now();
     kawarp.scale = KawarpOptionsStatic.scale ?? 1;
+    kawarp.saturation = KawarpOptionsStatic.saturation ?? 1.5;
+    kawarp.warpIntensity = KawarpOptionsStatic.warpIntensity ?? 1;
   });
 }
 
@@ -193,6 +201,7 @@ function stepMotionClock(): boolean {
     playing: SpotifyPlayer.IsPlaying,
     reducedMotion: reducedMotion.matches,
     track: motionTrack && motionTrack.uri === uri ? motionTrack.model : null,
+    beatSync: $beatSyncBackground.get(),
   });
   lastMotionFrame = now;
   return true;
@@ -842,6 +851,7 @@ function reapplyPageBackground() {
 }
 
 $backgroundStyle.listen(reapplyPageBackground);
+$rendererVisualStyle.listen(reapplyPageBackground);
 
 // ─── Image blur ──────────────────────────────────────────────────────────────
 

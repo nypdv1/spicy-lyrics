@@ -61,7 +61,14 @@ aside.NowPlayingView.spicy-dynamic-bg-in-this
   font-synthesis: none;
 }
 
+/* A custom font is scaled so its lowercase reads the size of the bundled font's
+   (customFontSize.ts). Lyrics only; the rest of the page keeps its sizes. */
+#SpicyLyricsPage:not(.UseSpicyFont) .LyricsContainer :is(.line, .line *, .SpaceGravityWord, .SpaceGravityWord *) {
+  font-size-adjust: var(--spicy-custom-font-adjust, none);
+}
+
 #SpicyLyricsPage.LyricsFontFallback .LyricsContainer :is(.line, .line *, .SpaceGravityWord, .SpaceGravityWord *) {
+  font-size-adjust: none;
   font-family: SpicyLyrics, "Noto Sans Georgian", "VazirmatnRegular", sans-serif !important;
   font-synthesis: auto;
 }

@@ -3,8 +3,11 @@ import { IsCompactMode } from "../../components/Utils/CompactMode.ts";
 import Fullscreen from "../../components/Utils/Fullscreen.ts";
 import { SyncNowBarSide } from "../../components/Utils/NowBar.ts";
 import { BuildBugReport, CopyText, DISCORD_INVITE_URL } from "../BugReport.ts";
-import { IsQueueOpen } from "../../components/Utils/QueueView.ts";
-import { $showNoLyricsNotice } from "../stores.ts";
+import { IsQueueOpen, SyncAutoQueue } from "../../components/Utils/QueueView.ts";
+import { $autoQueueWhenNoLyrics, $popupCoverWhenNoLyrics, $popupShowsCover, $showNoLyricsNotice } from "../stores.ts";
+import Global from "../../components/Global/Global.ts";
+import { IsPIP } from "../../components/Utils/PopupLyrics.ts";
+import { $experiment, isExperimentEnabled } from "../experiments.ts";
 
 type NoticeCopy = {
   title: string;
@@ -79,8 +82,8 @@ const NOTICES: Record<string, NoticeCopy> = {
     body: "Spicy Lyrics only shows lyrics for songs. Video podcast episodes aren't supported.",
   },
   "local-track": {
-    title: "No lyrics for local files",
-    body: "This song is a file on your computer, so we can't look it up online. You can add your own lyrics for it as a TTML file from the Local Lyrics DB.",
+    title: "No lyrics found for this file",
+    body: "Files on your computer are looked up by their title, artist and length, and no lyrics source had a match for this one. Check that the file's title and artist tags are right, or add your own lyrics for it as a TTML file from the Local Lyrics DB.",
   },
 };
 
@@ -109,12 +112,43 @@ export function SetShownNotice(descriptor: string | null): void {
   shownNotice = descriptor;
 }
 
+/**
+ * The popup shows the album cover where the lyrics would be. The Popup Player Dock lays the
+ * cover out across the window (PopupDock.css, .LyricsHidden); without the dock there's no
+ * such layout, so the lyrics stay.
+ */
+export function PopupShowsCover(): boolean {
+  return IsPIP && $popupShowsCover.get() && isExperimentEnabled("popupDock");
+}
+
+/**
+ * The full-window cover is up: chosen over the lyrics (PopupShowsCover), or standing in for a song
+ * with no lyrics (Album Cover When a Song Has No Lyrics). The second lasts only while that notice
+ * would show, so the next song's lyrics, and its loader before them, come back on their own.
+ */
+export function PopupCoverActive(): boolean {
+  if (PopupShowsCover()) return true;
+  return (
+    IsPIP &&
+    isExperimentEnabled("popupDock") &&
+    $popupCoverWhenNoLyrics.get() &&
+    !!shownNotice &&
+    NO_LYRICS_NOTICES.has(shownNotice) &&
+    !IsQueueOpen()
+  );
+}
+
+// Whether the cover was up at the last layout pass, so the artwork is placed again when it changes.
+let coverWasActive = false;
+
 function shouldHideLyricsArea(): boolean {
-  if (!shownNotice || !PageContainer) return false;
+  if (!PageContainer) return false;
   // The open queue takes the lyrics column, so the column stays.
   if (IsQueueOpen()) return false;
   // The NPV card has its own switch (Hide When a Song Has No Lyrics), which removes it.
   if (IsCardMode) return false;
+  if (PopupCoverActive()) return true;
+  if (!shownNotice) return false;
   if (!$showNoLyricsNotice.get() && NO_LYRICS_NOTICES.has(shownNotice)) return true;
   // Fullscreen, Cinema View and the popup show the song on its own instead of the
   // notice. Compact mode keeps the notice: the song info is already beside it.
@@ -136,10 +170,26 @@ export function SyncNoLyricsLayout(): void {
   const hide = shouldHideLyricsArea();
   page.querySelector(".ContentBox .LyricsContainer")?.classList.toggle("Hidden", hide);
   page.querySelector(".ContentBox")?.classList.toggle("LyricsHidden", hide);
+  // The cover chosen over the lyrics fills the whole popup (PopupDock.css); a song that simply has
+  // no lyrics keeps the framed cover above the dock.
+  const coverActive = hide && PopupCoverActive();
+  page.classList.toggle("PopupCoverMode", coverActive);
+  // The motion artwork or Canvas follows the cover in and out (GetArtworkPlacement).
+  if (coverActive !== coverWasActive) {
+    coverWasActive = coverActive;
+    queueMicrotask(() => Global.Event.evoke("canvas-stage:change", null));
+  }
   SyncNowBarSide();
+  // After this pass: opening or closing the queue runs SyncNoLyricsLayout again.
+  const noLyrics = !!shownNotice && NO_LYRICS_NOTICES.has(shownNotice);
+  queueMicrotask(() => SyncAutoQueue(noLyrics));
 }
 
 $showNoLyricsNotice.listen(() => queueMicrotask(SyncNoLyricsLayout));
+$popupShowsCover.listen(() => queueMicrotask(SyncNoLyricsLayout));
+$popupCoverWhenNoLyrics.listen(() => queueMicrotask(SyncNoLyricsLayout));
+$experiment("popupDock").listen(() => queueMicrotask(SyncNoLyricsLayout));
+$autoQueueWhenNoLyrics.listen(() => queueMicrotask(SyncNoLyricsLayout));
 
 const ICONS = {
   copy: `<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.25" y="5.25" width="8" height="8" rx="2"/><path d="M10.75 5.25V4.5a1.75 1.75 0 0 0-1.75-1.75H4.5A1.75 1.75 0 0 0 2.75 4.5V9a1.75 1.75 0 0 0 1.75 1.75h.75"/></svg>`,

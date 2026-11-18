@@ -83,7 +83,9 @@ export interface SyllableLead {
   };
   FlameOffset?: number;
   // Vocal stutters render one word but replay it over these source timings.
-  RestartRanges?: Array<{ StartTime: number; EndTime: number }>;
+  // CueTime: when that repeat of the whole phrase begins; the word waits
+  // unlit from then until its own StartTime.
+  RestartRanges?: Array<{ StartTime: number; EndTime: number; CueTime?: number }>;
   RestartRangeStart?: number;
 }
 

@@ -132,11 +132,8 @@ export const EXPERIMENTS = [
     category: "player",
     label: "Popup Player Dock",
     description:
-      "The experimental docked popup layout. It hides the full player until pointer movement; the pre-October Pixel-fork Mini Player layout is used by default.",
-    default: false,
-    // The dock replaces the normal full Mini Player layout with a pointer-only
-    // transport. Keep it off until its responsive layout can stand on its own.
-    forceState: false,
+      "Popup lyrics fill the whole window, with the player docked along the bottom like the Canvas Stage: title and artist at rest, the timeline and controls rising in when you move the mouse. Disable to bring back the cover header and the controls over the enlarged cover.",
+    default: true,
     pageClass: "Exp_PopupDock",
   },
   {

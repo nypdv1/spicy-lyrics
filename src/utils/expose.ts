@@ -14,6 +14,7 @@ import { SpotifyPlayer } from "../components/Global/SpotifyPlayer.ts";
 import { getBackgroundMotionState } from "../components/DynamicBG/dynamicBackground.ts";
 import { ForceNextUp } from "../components/Utils/NextUp.ts";
 import { GetVocalCurve } from "./Lyrics/VocalCurve.ts";
+import { showProfileModal } from "../components/ReactComponents/ProfileCard/ProfileCardModal.tsx";
 
 export function exposeToWindow() {
     const api = {
@@ -56,6 +57,14 @@ export function exposeToWindow() {
             vocalCurve: (uri: string = SpotifyPlayer.GetUri() ?? "") => GetVocalCurve(uri),
             // What Experimental Word Sync did on the last apply: source type, timing used, voice data.
             wordSync: () => GetLastWordSync(),
+            // Open a contributor's profile card by their user id; resolves with how it went.
+            profileCard: (userId: string) =>
+                new Promise<string>((resolve) => {
+                    showProfileModal(userId, document, {
+                        signal: new AbortController().signal,
+                        onState: (state) => { if (state !== "loading") resolve(state); },
+                    });
+                }),
         },
         request: {
             QueryAPI: {

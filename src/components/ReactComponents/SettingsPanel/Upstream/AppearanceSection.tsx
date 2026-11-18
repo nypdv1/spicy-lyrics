@@ -2,7 +2,8 @@ import { useStore } from "@nanostores/react";
 import {
   $animationFpsCap,
   $animationFpsCapEnabled,
-  $customFont,
+  $customGoogleFont,
+  $customSystemFont,
   $customFontEnabled,
   $customFontSource,
   $skipSpicyFont,
@@ -10,8 +11,8 @@ import {
 } from "../../../../utils/stores.ts";
 import { Select, Slider, Toggle } from "./components.tsx";
 import { AppearanceIcon } from "./icons.tsx";
-import { GOOGLE_FONT_OPTIONS } from "../../../../utils/googleFonts.ts";
-import { FontPreviewPicker } from "../FontPreviewPicker.tsx";
+import { isGoogleFont } from "../../../../utils/googleFonts.ts";
+import { FontPicker } from "./FontPicker.tsx";
 import type { GroupDef, SectionDef } from "./model.ts";
 
 // Built once: the Control components must keep their identity across renders.
@@ -58,12 +59,15 @@ const groups: GroupDef[] = [
         description: "Browse Google Fonts with live previews. The selected font loads through coolLabs Fonts.",
         keywords: "google font family typeface coollabs",
         useDisabled: () => {
-          if (!useStore($customFontEnabled)) return "Turn on Use Custom Font to change this.";
-          return useStore($customFontSource) !== "google" && "Choose Google Fonts as the Font Source first.";
+          // Both hooks run on every render; an early return between them crashes the panel when the toggle flips.
+          const enabled = useStore($customFontEnabled);
+          const source = useStore($customFontSource);
+          if (!enabled) return "Turn on Use Custom Font to change this.";
+          return source !== "google" && "Choose Google Fonts as the Font Source first.";
         },
         Control: ({ disabled, label }) => {
-          const value = useStore($customFont);
-          return <FontPreviewPicker disabled={disabled} source="google" value={GOOGLE_FONT_OPTIONS.includes(value as typeof GOOGLE_FONT_OPTIONS[number]) ? value : ""} onChange={(font) => $customFont.set(font)} />;
+          const value = useStore($customGoogleFont);
+          return <FontPicker label={label} disabled={disabled} source="google" value={isGoogleFont(value) ? value : ""} onChange={(font) => $customGoogleFont.set(font)} />;
         },
       },
       {
@@ -72,10 +76,12 @@ const groups: GroupDef[] = [
         description: "Browse installed fonts with live previews.",
         keywords: "installed local system font family typeface",
         useDisabled: () => {
-          if (!useStore($customFontEnabled)) return "Turn on Use Custom Font to change this.";
-          return useStore($customFontSource) !== "system" && "Choose System Font as the Font Source first.";
+          const enabled = useStore($customFontEnabled);
+          const source = useStore($customFontSource);
+          if (!enabled) return "Turn on Use Custom Font to change this.";
+          return source !== "system" && "Choose System Font as the Font Source first.";
         },
-        Control: ({ disabled }) => <FontPreviewPicker disabled={disabled} source="system" value={useStore($customFont)} onChange={(font) => $customFont.set(font)} />,
+        Control: ({ disabled, label }) => <FontPicker label={label} disabled={disabled} source="system" value={useStore($customSystemFont)} onChange={(font) => $customSystemFont.set(font)} />,
       },
       {
         id: "skipSpicyFont",

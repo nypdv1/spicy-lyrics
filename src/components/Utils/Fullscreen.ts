@@ -310,11 +310,14 @@ const Page_MouseOut = () => {
    skipped for paint, layout, focus and the accessibility tree. Fixed at the
    same full-window box takes #main out of the flow like display: none did, so
    a page that ends up in flow (themes that set position: relative on it)
-   still starts at the top. */
+   still starts at the top. Its own empty box is still hit-tested, though, and a theme
+   that gives #main a z-index lifts it over the page, where it swallowed clicks on the
+   queue's covers. It takes no pointer events while hidden. */
 const HIDDEN_MAIN_STYLES = {
   "content-visibility": "hidden",
   position: "fixed",
   inset: "0",
+  "pointer-events": "none",
 } as const;
 
 // The Now Playing sidebar is inside #main, so its background has nothing to draw while it's hidden.

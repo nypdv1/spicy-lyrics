@@ -175,6 +175,9 @@ export type Artist = {
   uri: string;
 };
 
+// Songs whose liked state is being looked up, so a lookup isn't started again each check.
+const likedLookups = new Set<string>();
+
 export const SpotifyPlayer = {
   IsPlaying: false,
   _DEPRECATED_: {
@@ -213,7 +216,9 @@ export const SpotifyPlayer = {
     if (Spicetify?.Player?.data?.item?.duration?.milliseconds) {
       return Spicetify.Player.data.item.duration.milliseconds;
     }
-    return 0;
+    // An untagged local file reports a length of 0 in its metadata; the player still knows it.
+    const playerDuration = Spicetify?.Player?.getDuration?.();
+    return typeof playerDuration === "number" && playerDuration > 0 ? playerDuration : 0;
   },
   Seek: (position: number): void => {
     (Spicetify?.Player as any)?.origin?.seekTo(position);
@@ -354,7 +359,28 @@ export const SpotifyPlayer = {
       data.item?.type === "unknown"
     );
   },
-  IsLiked: () => Spicetify?.Player?.getHeart(),
+  /**
+   * Whether the playing song is in Liked Songs. Spotify's library cache (containsSync) follows
+   * every like and unlike, wherever it happens; the player's own heart flag doesn't. A song the
+   * cache hasn't seen yet is looked up, and the player's flag stands in until it's back.
+   */
+  IsLiked: (): boolean => {
+    const uri = SpotifyPlayer.GetUri();
+    const library = Spicetify?.Platform?.LibraryAPI;
+    if (uri && library?.containsSync) {
+      try {
+        const cached = library.containsSync(uri);
+        if (typeof cached === "boolean") return cached;
+        if (!likedLookups.has(uri)) {
+          likedLookups.add(uri);
+          void Promise.resolve(library.contains(uri)).finally(() => likedLookups.delete(uri));
+        }
+      } catch {
+        // Not a library item (a local file, an ad); the player's flag is all there is.
+      }
+    }
+    return Boolean(Spicetify?.Player?.getHeart());
+  },
   ToggleLike: async () => {
     const uris = [SpotifyPlayer.GetUri()];
     if (SpotifyPlayer.IsLiked()) {

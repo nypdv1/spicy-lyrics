@@ -3,6 +3,7 @@ import { $lrcRedAcceptModelSynced } from "../../stores.ts";
 import Logger from "../../Logger.ts";
 import parseTTMLToLyrics from "../ParseTTML.ts";
 import { createProviderResult } from "./Shared.ts";
+import { PickSearchHit } from "./SearchMatch.ts";
 import type { ExternalLyricsResult, TrackLyricsInfo } from "./Types.ts";
 
 const lrcRedLogger = new Logger("lrc.red");
@@ -137,11 +138,11 @@ function moveModelSyncedParentheticalsToBackground(lyrics: any): void {
 }
 
 /**
- * lrc.red's model occasionally gives a line's final word an almost zero-length
- * window. When the following line is close, carry that final word through to its
- * start; a real gap still gets the conservative 150 ms fallback. Keep the word
- * as one unit (it may be split across several syllables) and extend only its
- * final syllable.
+ * lrc.red's model occasionally gives a line's final word, or the final syllable of
+ * a word sung in parts, an almost zero-length window. When the following line is
+ * close, carry that final syllable through to its start; a real gap still gets the
+ * conservative 150 ms fallback. Keep the word as one unit (it may be split across
+ * several syllables) and extend only its final syllable.
  */
 function fixShortModelSyncedLineEndings(lyrics: any): void {
   if (lyrics?.Type !== "Syllable" || !Array.isArray(lyrics.Content)) return;
@@ -159,17 +160,26 @@ function fixShortModelSyncedLineEndings(lyrics: any): void {
 
     const first = syllables[finalWordStartIndex];
     const last = syllables[lastIndex];
-    if (typeof first?.StartTime !== "number" || typeof last?.EndTime !== "number") continue;
-    if (last.EndTime - first.StartTime >= MODEL_SYNC_SHORT_FINAL_WORD_DURATION) continue;
+    if (
+      typeof first?.StartTime !== "number" ||
+      typeof last?.StartTime !== "number" ||
+      typeof last?.EndTime !== "number"
+    ) continue;
+    const wordTooShort = last.EndTime - first.StartTime < MODEL_SYNC_SHORT_FINAL_WORD_DURATION;
+    // A word long enough overall can still end on a syllable that only flashes by.
+    const syllableTooShort = last.EndTime - last.StartTime < MODEL_SYNC_SHORT_FINAL_WORD_DURATION;
+    if (!wordTooShort && !syllableTooShort) continue;
 
     const nextLineStart = lyrics.Content[lineIndex + 1]?.Lead?.StartTime;
     const gapToNextLine =
       typeof nextLineStart === "number" ? nextLineStart - last.EndTime : Number.POSITIVE_INFINITY;
-    last.EndTime =
-      gapToNextLine >= 0 && gapToNextLine <= MODEL_SYNC_NEXT_LINE_MAX_GAP
-        ? nextLineStart
-        : first.StartTime + MODEL_SYNC_MIN_FINAL_WORD_DURATION;
-    vocal.Lead.EndTime = last.EndTime;
+    const fallbackEnd = (wordTooShort ? first.StartTime : last.StartTime) + MODEL_SYNC_MIN_FINAL_WORD_DURATION;
+    // Only ever lengthened.
+    last.EndTime = Math.max(
+      last.EndTime,
+      gapToNextLine >= 0 && gapToNextLine <= MODEL_SYNC_NEXT_LINE_MAX_GAP ? nextLineStart : fallbackEnd
+    );
+    vocal.Lead.EndTime = Math.max(vocal.Lead.EndTime ?? last.EndTime, last.EndTime);
   }
 }
 
@@ -182,11 +192,15 @@ export function LyricsFromLrcRedTTML(ttml: string): any | null {
     moveModelSyncedParentheticalsToBackground(parsed);
     fixShortModelSyncedLineEndings(parsed);
   }
+  // lrc.red's hand-synced word timing is Apple Music's, so it's credited and handled as Apple
+  // Music lyrics (word splitting included), shown as "Apple Music via lrc.red".
+  const appleMusic = !byModel && parsed.Type === "Syllable";
   return createProviderResult(
     {
       ...parsed,
-      source: "lrc.red",
-      sourceDisplayName: byModel ? "lrc.red (model synced)" : "lrc.red",
+      ...(appleMusic
+        ? { source: "aml", sourceDisplayName: "Apple Music", source_via: "lrc-red" }
+        : { source: "lrc.red", sourceDisplayName: byModel ? "lrc.red (model synced)" : "lrc.red" }),
       lrcRedByModel: byModel,
     },
     "lrcred"
@@ -200,15 +214,90 @@ async function fetchTTML(isrc: string, fresh: boolean): Promise<string | null> {
   return res.text();
 }
 
+type LrcRedSearchHit = { isrc?: string; title?: string; artist?: string; duration?: number; byModel?: boolean };
+
+/**
+ * The ISRC of this track in lrc.red's catalogue, by searching it for the title and artist: for a
+ * local file, which has none of its own, or a Spotify track whose metadata lacks one.
+ */
+// Another release of a song (a longer outro, an extended mix) can be off by more than the usual
+// few seconds and still be timed the same. Such a hit is only taken when nothing closer is, and
+// only if its lyrics end inside the track (fitsTrack).
+const LOOSE_DURATION_TOLERANCE_SEC = 20;
+
+type LrcRedSearchResult = { isrc: string; loose: boolean };
+
+async function searchLrcRedIsrc(trackInfo: TrackLyricsInfo): Promise<LrcRedSearchResult | null> {
+  // Artist and title first, then the title alone, for a song the artist's name buries in the
+  // results. A hit must still name this artist (PickSearchHit), so the title alone can't match
+  // a different song.
+  const queries = [...new Set([`${trackInfo.artist} ${trackInfo.title}`.trim(), trackInfo.title.trim()])].filter(Boolean);
+  const hitLists: LrcRedSearchHit[][] = [];
+  for (const query of queries) {
+    const hits = await searchLrcRed(query);
+    hitLists.push(hits);
+    const isrc = pickLrcRedHit(hits, trackInfo);
+    if (isrc) return { isrc, loose: false };
+  }
+  for (const hits of hitLists) {
+    const isrc = pickLrcRedHit(hits, trackInfo, LOOSE_DURATION_TOLERANCE_SEC);
+    if (isrc) return { isrc, loose: true };
+  }
+  return null;
+}
+
+async function searchLrcRed(query: string): Promise<LrcRedSearchHit[]> {
+  const res = await fetch(`${LRC_RED_ORIGIN}/search.json?q=${encodeURIComponent(query)}`, {
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!res.ok) return [];
+  const body = (await res.json()) as { hits?: LrcRedSearchHit[] };
+  const acceptModel = $lrcRedAcceptModelSynced.get();
+  return (body.hits ?? []).filter(
+    (hit) => typeof hit.isrc === "string" && ISRC_PATTERN.test(hit.isrc.toUpperCase()) && (acceptModel || !hit.byModel)
+  );
+}
+
+function pickLrcRedHit(hits: LrcRedSearchHit[], trackInfo: TrackLyricsInfo, toleranceSec?: number): string | null {
+  const hit = PickSearchHit(
+    hits,
+    trackInfo,
+    (h) => ({ title: h.title ?? "", artist: h.artist ?? "", durationSec: h.duration }),
+    // A hand-synced file over a model's, where both are this song.
+    (h) => (h.byModel ? 0 : 1),
+    toleranceSec
+  );
+  return hit?.isrc?.toUpperCase() ?? null;
+}
+
+/** Whether the lyrics end before the track does (with a second's slack). */
+function fitsTrack(lyrics: any, durationMs: number): boolean {
+  const content: any[] = Array.isArray(lyrics?.Content) ? lyrics.Content : [];
+  const lastEnd = Math.max(0, ...content.map((line) => line?.Lead?.EndTime ?? line?.EndTime ?? 0));
+  return durationMs <= 0 || lastEnd <= durationMs / 1000 + 1;
+}
+
 export async function fetchLrcRedLyrics(trackInfo: TrackLyricsInfo): Promise<ExternalLyricsResult | null> {
   try {
-    const isrc = await GetTrackIsrc(trackInfo.id);
-    if (!isrc) return null;
-    const ttml = await fetchTTML(isrc, false);
-    if (!ttml) return null;
-    if (!$lrcRedAcceptModelSynced.get() && isModelSynced(ttml)) return null;
+    // A local file's "id" is part of its path; it has no Spotify metadata to read an ISRC from.
+    const isLocalFile = trackInfo.uri.startsWith("spotify:local:");
+    const acceptModel = $lrcRedAcceptModelSynced.get();
+    const usable = (ttml: string | null): ttml is string => !!ttml && (acceptModel || !isModelSynced(ttml));
+
+    // The track's own ISRC first. When lrc.red has nothing usable under it (often a different
+    // release of the same song is filed under another ISRC), search by title and artist.
+    const ownIsrc = isLocalFile ? null : await GetTrackIsrc(trackInfo.id);
+    let ttml = ownIsrc ? await fetchTTML(ownIsrc, false) : null;
+    let loose = false;
+    if (!usable(ttml)) {
+      const found = await searchLrcRedIsrc(trackInfo);
+      loose = found?.loose ?? false;
+      ttml = found && found.isrc !== ownIsrc ? await fetchTTML(found.isrc, false) : null;
+    }
+    if (!usable(ttml)) return null;
     const lyrics = LyricsFromLrcRedTTML(ttml);
-    return lyrics ? { lyrics, status: 200 } : null;
+    if (!lyrics || (loose && !fitsTrack(lyrics, trackInfo.durationMs))) return null;
+    return { lyrics, status: 200 };
   } catch (error) {
     lrcRedLogger.warn("Couldn't fetch lyrics", error);
     return null;

@@ -3,12 +3,14 @@ import Global from "../Global/Global.ts";
 import { PageContainer } from "../Pages/PageView.ts";
 import { Icons } from "../Styling/Icons.ts";
 import Fullscreen from "./Fullscreen.ts";
+import { NowBar_SwapSides, OpenNowBar, ToggleNowBar } from "./NowBar.ts";
 import { IsPIP } from "./PopupLyrics.ts";
 import { SyncNoLyricsLayout } from "../../utils/Lyrics/LyricsNotice.ts";
 import Logger from "../../utils/Logger.ts";
 import { createTooltip } from "../../utils/tooltip.ts";
 import { CreateTextScroller, type TextScroller } from "../../utils/TextScroller.ts";
 import { RefreshSwitchClearance, WatchViewSwitch } from "../../utils/ViewSwitchClearance.ts";
+import { $autoQueueWhenNoLyrics, $hideNowBarInCinema } from "../../utils/stores.ts";
 
 /*
  * The queue in Cinema View and fullscreen. It takes the lyrics column while it's open: the
@@ -45,8 +47,8 @@ type MoveTarget = { before: QueueTrack } | { after: QueueTrack };
 const NEXT_UP_LIMIT = 30;
 const QUEUED_LIMIT = 50;
 const LEAVE_MS = 200;
-// The lyrics' return in QueueView.css: 80 ms delay + 280 ms fade, with a little to spare.
-const LYRICS_RETURN_MS = 420;
+// The lyrics' return in QueueView.css: 80 ms delay + 520 ms settle, with a little to spare.
+const LYRICS_RETURN_MS = 640;
 // A fetch answered quicker than this never shows the placeholder rows.
 const SKELETON_DELAY_MS = 160;
 const CLEAR_CONFIRM_MS = 3000;
@@ -61,6 +63,11 @@ const EASE_OUT = "cubic-bezier(0.23, 1, 0.32, 1)";
 const EASE_IN_OUT = "cubic-bezier(0.77, 0, 0.175, 1)";
 
 let open = false;
+// Opened because the song has no lyrics (SyncAutoQueue), not from the switch. Only such a
+// queue closes by itself when lyrics come back.
+let autoOpened = false;
+// The song whose automatic queue was switched back to the lyrics by hand: it stays shut.
+let dismissedUri: string | null = null;
 let panel: HTMLElement | null = null;
 let list: HTMLElement | null = null;
 let status: HTMLElement | null = null;
@@ -127,6 +134,30 @@ export const IsQueueOpen = () => open;
 /** Only Cinema View and fullscreen have room for it; the popup keeps its own layout. */
 const CanShowQueue = () => !!PageContainer && Fullscreen.IsOpen && !IsPIP;
 
+const CurrentUri = (): string | null => Spicetify.Player.data?.item?.uri ?? null;
+
+/**
+ * Shows the queue in place of a song's missing lyrics in fullscreen and Cinema View, and
+ * hands the column back once a song with lyrics plays. Called from SyncNoLyricsLayout,
+ * which runs whenever the notice, fullscreen or compact mode changes.
+ */
+export function SyncAutoQueue(noLyrics: boolean) {
+  if (!noLyrics || !$autoQueueWhenNoLyrics.get()) {
+    if (!noLyrics) dismissedUri = null;
+    if (autoOpened && open) {
+      autoOpened = false;
+      CloseQueue();
+    }
+    return;
+  }
+  if (open || !CanShowQueue()) return;
+  const uri = CurrentUri();
+  if (dismissedUri && dismissedUri === uri) return;
+  dismissedUri = null;
+  OpenQueue();
+  if (open) autoOpened = true;
+}
+
 export function OpenQueue() {
   if (open || !CanShowQueue() || !PageContainer) return;
   const page = PageContainer;
@@ -166,6 +197,8 @@ export function OpenQueue() {
 /** `immediate` skips the exit fade, for a page that is leaving fullscreen or going away. */
 export function CloseQueue(immediate = false) {
   if (!open && !immediate) return;
+  if (autoOpened && !immediate) dismissedUri = CurrentUri();
+  autoOpened = false;
   open = false;
   EndDrag("cancel", false);
   FinishSettle();
@@ -1582,14 +1615,51 @@ function BuildSwitch(doc: Document): HTMLElement {
   const queue = GlyphAt(Icons.Queue, 48 + SWITCH_GAP);
   const mask = `SL_ViewSwitchMask_${Math.random().toString(36).slice(2, 8)}`;
   // Seats on either side of the track: the scroll-to-active button while it is shown
-  // (ScrollToActiveLine.ts), and the romanization toggle while the lyrics can be romanized.
+  // (ScrollToActiveLine.ts), the romanization toggle while the lyrics can be romanized, the NowBar
+  // side swap while there's a NowBar, then the NowBar toggle and the exit button.
   root.innerHTML = `<div class="ViewSwitchSeat ViewSwitchSeat_Scroll"></div><div class="ViewSwitchTrack" role="radiogroup" aria-label="Show"><button type="button" class="ViewSwitchOption" role="radio" data-view="lyrics" aria-label="Lyrics"></button><button type="button" class="ViewSwitchOption" role="radio" data-view="queue" aria-label="Queue"></button>${LayerSvg(
     "ViewSwitchGlyph ViewSwitchGlyph_Lyrics",
     Strokes(lyrics, "currentColor")
   )}${LayerSvg("ViewSwitchGlyph ViewSwitchGlyph_Queue", Strokes(queue, "currentColor"))}${LayerSvg(
     "ViewSwitchThumb",
     `<mask id="${mask}" maskUnits="userSpaceOnUse" x="${-BLEED}" y="${-BLEED}" width="${SWITCH_WIDTH + BLEED * 2}" height="${48 + BLEED * 2}">${Plate(`fill="#fff"`)}${Strokes(lyrics + queue, "#000")}</mask>${Plate(`fill="#fff" mask="url(#${mask})"`)}`
-  )}</div><div class="ViewSwitchSeat ViewSwitchSeat_Romanize"></div>`;
+  )}</div><div class="ViewSwitchSeat ViewSwitchSeat_Romanize"></div><div class="ViewSwitchSeat ViewSwitchSeat_Swap"><button type="button" class="ViewSwitchSwap" aria-label="Swap NowBar Side"></button></div><div class="ViewSwitchSeat ViewSwitchSeat_NowBar"><button type="button" class="ViewSwitchNowBar" aria-label="NowBar"></button></div><div class="ViewSwitchSeat ViewSwitchSeat_Exit"><button type="button" class="ViewSwitchExit"></button></div>`;
+
+  // The view controls drop their NowBar toggle in fullscreen and Cinema View; this is it there.
+  // In Cinema View it flips Hide NowBar in Cinema View, whose layout gives the lyrics the whole
+  // width, so the button is the way back as well as the way out.
+  const nowBar = root.querySelector<HTMLButtonElement>(".ViewSwitchNowBar")!;
+  nowBar.innerHTML = Icons.NowBar;
+  nowBar.addEventListener("click", () => {
+    if (!Fullscreen.CinemaViewOpen) {
+      ToggleNowBar();
+      return;
+    }
+    if (NowBarShown()) {
+      $hideNowBarInCinema.set(true);
+      return;
+    }
+    $hideNowBarInCinema.set(false);
+    if (!PageContainer?.classList.contains("NowBarStatus__Open")) OpenNowBar();
+  });
+  const swap = root.querySelector<HTMLButtonElement>(".ViewSwitchSwap")!;
+  swap.innerHTML = Icons.NowBarSideSwap;
+  swap.addEventListener("click", () => NowBar_SwapSides());
+  const swapTip = createTooltip(swap, { ...(Spicetify as any).TippyProps, placement: "top", content: "Swap NowBar Side" });
+  if (swapTip) switchTooltips.push(swapTip);
+  SyncNowBarButton(root);
+  const nowBarTip = createTooltip(nowBar, { ...(Spicetify as any).TippyProps, placement: "top", content: "NowBar" });
+  if (nowBarTip) switchTooltips.push(nowBarTip);
+
+  // The way out, always at the corner end. The view controls hold it too, but a theme can move
+  // or hide those, and this corner is where the other controls for this view already are.
+  const exit = root.querySelector<HTMLButtonElement>(".ViewSwitchExit")!;
+  const exitLabel = Fullscreen.CinemaViewOpen ? "Exit Cinema View" : "Exit Fullscreen";
+  exit.setAttribute("aria-label", exitLabel);
+  exit.innerHTML = Icons.CloseFullscreen;
+  exit.addEventListener("click", () => void Fullscreen.Close());
+  const exitTip = createTooltip(exit, { ...(Spicetify as any).TippyProps, placement: "top", content: exitLabel });
+  if (exitTip) switchTooltips.push(exitTip);
 
   const options = [...root.querySelectorAll<HTMLButtonElement>(".ViewSwitchOption")];
   const pick = (view: string | undefined) => {
@@ -1660,6 +1730,24 @@ export function SeatRomanizationToggle() {
   if (seat && toggle) seat.replaceChildren(toggle);
 }
 
+/** The NowBar is on screen: open, and not taken away by Hide NowBar in Cinema View. */
+const NowBarShown = () =>
+  !!PageContainer?.classList.contains("NowBarStatus__Open") &&
+  !(Fullscreen.CinemaViewOpen && $hideNowBarInCinema.get());
+
+/** The NowBar button's pressed state, and the swap seat, which opens only while there's a NowBar. */
+function SyncNowBarButton(root = viewSwitch) {
+  if (!root) return;
+  const shown = NowBarShown();
+  root.querySelector(".ViewSwitchNowBar")?.setAttribute("aria-pressed", String(shown));
+  root.classList.toggle("HasNowBar", shown);
+}
+
+for (const event of ["nowbar:open", "nowbar:close"]) {
+  Global.Event.listen(event, () => SyncNowBarButton());
+}
+$hideNowBarInCinema.listen(() => queueMicrotask(() => SyncNowBarButton()));
+
 function RemoveSwitch(announce = true) {
   if (!viewSwitch) return;
   for (const tip of switchTooltips) tip.destroy?.();
@@ -1674,12 +1762,13 @@ function RemoveSwitch(announce = true) {
 // --- NowBar side swap ---
 
 /*
- * Swapping the NowBar's side glides the lyrics across with the NowBar's own `left 0.4s` (ease).
+ * Swapping the NowBar's side glides the lyrics across with the NowBar's own `left` transition
+ * (ContentBox.css: 0.5s, --ease-in-out).
  * The panel and the switch would jump to the other side, so they make the same trip: measured
  * before and after the swap and played back from where they stood. Measuring includes a slide
  * still running, so a second swap mid-way picks up from there.
  */
-const SIDE_SWAP_MS = 400;
+const SIDE_SWAP_MS = 500;
 let sideSwapStarts: { el: HTMLElement; x: number }[] = [];
 let sideSwapAnimations: Animation[] = [];
 
@@ -1710,10 +1799,10 @@ Global.Event.listen("nowbar:side-swap:after", () => {
       reduce
         ? // Only a start keyframe: it fades up to whatever the element rests at (the switch sits
           // at 0.65 or 0).
-          el.animate([{ opacity: 0, offset: 0 }], { duration: 200, easing: "ease" })
+          el.animate([{ opacity: 0, offset: 0 }], { duration: 200, easing: EASE_OUT })
         : el.animate([{ translate: `${dx}px 0` }, { translate: "0 0" }], {
             duration: SIDE_SWAP_MS,
-            easing: "ease",
+            easing: EASE_IN_OUT,
           })
     );
   }

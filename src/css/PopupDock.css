@@ -48,7 +48,7 @@
     --PD_TimelineH: var(--PD_BarRow);
   }
 
-  .spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock .ContentBox .NowBar .MediaContent .Timeline .Time {
+  .spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock .ContentBox .NowBar .MediaContent .Timeline :is(.Time, .TimelineCredits) {
     display: none;
   }
 }
@@ -144,6 +144,56 @@
   height: 100%;
 }
 
+/* Album Cover Instead of Lyrics (PopupCoverMode, LyricsNotice.ts): the cover fills the whole
+   window, cropped to it, with the dock over it. It still lives in the MediaBox (the control rows,
+   moved by the dock's drop), so it reaches from there to the window's edges and undoes the drop.
+   The controls sit above it in the MediaBox (MediaContent, z-index 99). */
+.spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock.PopupCoverMode .ContentBox.LyricsHidden .NowBar .CenteredView .Header .MediaBox .MediaImageContainer {
+  left: 0;
+  right: 0;
+  bottom: calc(-1 * var(--PD_Bottom));
+  width: 100%;
+  height: 100vh;
+  border-radius: 0 !important;
+  --BorderRadius: 0px !important;
+  translate: 0 calc(-1 * var(--PD_Drop));
+  transform-origin: center;
+}
+
+@starting-style {
+  .spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock.PopupCoverMode .ContentBox.LyricsHidden .NowBar .CenteredView .Header .MediaBox .MediaImageContainer {
+    opacity: 0;
+    scale: 1.02;
+  }
+}
+
+.spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock.PopupCoverMode .ContentBox.LyricsHidden .NowBar .MediaImageContainer .ib_ImageBox,
+.spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock.PopupCoverMode .ContentBox.LyricsHidden .NowBar .MediaImageContainer .fi_FromImage::before {
+  background-size: cover;
+  background-position: center;
+}
+
+/* The dock's own fade sits under the MediaBox, so the cover would hide it; the cover carries the
+   fade itself, under the controls, deepening as the dock rises. */
+.spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock.PopupCoverMode .ContentBox.LyricsHidden .NowBar .MediaImageContainer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, calc(0.45 + 0.2 * var(--DockLift, 0))) 0%,
+    rgba(0, 0, 0, calc(0.25 + 0.15 * var(--DockLift, 0))) calc(var(--PD_Bottom) + var(--PD_BoxH) + var(--PD_MetaH)),
+    transparent calc(var(--PD_Bottom) + var(--PD_BoxH) + var(--PD_MetaH) + 48px)
+  );
+  pointer-events: none;
+}
+
+/* The title and artist sit outside the MediaBox, which the cover now fills; they go above it. */
+.spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock.PopupCoverMode .ContentBox .NowBar .CenteredView .Header .Metadata {
+  z-index: 4;
+}
+
 /* Title and artist: a caption on the gutter, above the control rows. */
 .spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock .ContentBox .NowBar .CenteredView .Header .Metadata {
   position: absolute;
@@ -183,6 +233,40 @@
 }
 
 .spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock .ContentBox .NowBar .CenteredView .Header .Metadata .Artists {
+  font-size: var(--PD_ArtistSize) !important;
+  line-height: 1.35 !important;
+}
+
+/* The row around the artists and the release year (ContentBox.css). Compact mode indents it and
+   stretches the artists across it, which pushed the year to the far edge. Here the artists start
+   under the title and the year follows them, in the artists' size. */
+.spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock .ContentBox .NowBar .CenteredView .Header .Metadata .ArtistsRow {
+  width: 100%;
+  max-width: 100%;
+  padding-left: 0;
+  justify-content: flex-start;
+}
+
+/* Sized to its names. As a size container it would have no width of its own; the marquee gets its
+   distance in px from NowBar.ts, so it doesn't need one. */
+.spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock .ContentBox .NowBar .CenteredView .Header .Metadata .ArtistsRow .Artists {
+  container-type: normal;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+/* The names' end padding is room for the marquee's fade; at rest the year follows straight on. */
+.spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock .ContentBox .NowBar .CenteredView .Header .Metadata .ArtistsRow .Artists:not(.CanMarquee) > span {
+  padding-right: 0;
+}
+
+/* Its end fade sits in that padding; without it, the fade would eat the last letters. */
+.spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock .ContentBox .NowBar .CenteredView .Header .Metadata .ArtistsRow .Artists:not(.CanMarquee) {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
+.spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock .ContentBox .NowBar .CenteredView .Header .Metadata .ArtistsRow .ArtistYear {
   font-size: var(--PD_ArtistSize) !important;
   line-height: 1.35 !important;
 }
@@ -298,6 +382,147 @@
 .spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock .ContentBox .NowBar .MediaContent .Timeline .Time.Duration {
   grid-column: 3;
   text-align: right;
+}
+
+/* Pinned credits: one line in the times row, between the elapsed and total times (DockCredits.ts
+   moves the pinned footer's rows in). A cell of the timeline's grid, it stays centred under the
+   bar as the dock rises, falls and resizes. A line that doesn't fit drops its avatars
+   (data-marquee) and scrolls like the song name (TextScroller.ts). */
+.spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock .NowBar .Timeline .TimelineCredits {
+  grid-column: 2;
+  grid-row: 2;
+  min-width: 0;
+  display: flex;
+  justify-content: safe center;
+  --TC_Pad: clamp(6px, calc(var(--PD_U) * 2), 12px);
+  padding-inline: var(--TC_Pad);
+  font-size: var(--PD_TimeSize);
+  line-height: 1.3;
+  font-weight: var(--w-medium);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  /* Room under the line for the names' underline, which the clip would cut at small sizes; the
+     negative margin keeps the row as tall as the times. */
+  padding-bottom: 0.25em;
+  margin-bottom: -0.25em;
+  animation: TimelineCreditsIn 0.36s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* With the cover in place of the lyrics there are no lyrics for the credits to describe. */
+.spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock.PopupCoverMode .NowBar .Timeline .TimelineCredits,
+.spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock .NowBar .Timeline .TimelineCredits[hidden] {
+  display: none;
+}
+
+@keyframes TimelineCreditsIn {
+  from {
+    opacity: 0;
+    translate: 0 -0.35em;
+  }
+}
+
+.spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock .NowBar .TimelineCredits :is(.SongCredits, .SongInfo, .Credits, .LyricsProvider, .Maker, .Uploader, .song-info-profile-section) {
+  display: flex;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  font-size: inherit !important;
+  line-height: inherit;
+  opacity: 1;
+}
+
+/* The label and value ("Provided by" lrc.red, "Written by" …) are joined by a plain space
+   (CreditsRow.ts), which a flex row drops; the gap puts it back. */
+.spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock .NowBar .TimelineCredits :is(.Credits, .LyricsProvider) {
+  gap: 0.3em;
+}
+
+/* Nothing shrinks, so the line's width is its natural width. */
+.spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock .NowBar .TimelineCredits * {
+  flex-shrink: 0;
+}
+
+/* The rows of the line, set apart like the credits in the lyrics. */
+.spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock .NowBar .TimelineCredits .SongCredits > :not(:first-child)::before {
+  content: "\00b7";
+  margin-inline: 0.45em;
+}
+
+/* "Provided by Spicy Lyrics Community" next to "Community lyrics" says it twice. */
+.spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock .NowBar .TimelineCredits .SongCredits:has(> .CommunityCredits) > .LyricsProvider,
+.spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock .NowBar .TimelineCredits .SongInfoNote,
+.spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock .NowBar .TimelineCredits[data-marquee] .song-info-profile-section img {
+  display: none;
+}
+
+/* While it scrolls: the edges fade across the padding, so the text's ends are clear at either hold. */
+.spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock .NowBar .TimelineCredits[data-marquee] {
+  --TC_Pad: max(clamp(6px, calc(var(--PD_U) * 2), 12px), 1em);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 var(--TC_Pad), #000 calc(100% - var(--TC_Pad)), transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 var(--TC_Pad), #000 calc(100% - var(--TC_Pad)), transparent 100%);
+}
+
+/* Within the community credits: "Community lyrics · Made by A and B · Uploaded by C". A second
+   or later maker keeps its own "and" or ",". */
+.spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock .NowBar .TimelineCredits .SongInfoLead::after,
+.spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock .NowBar .TimelineCredits :is(.Maker:not(.MakerContinued), .Uploader):not(.SongInfoLead + *)::before {
+  content: "\00b7";
+  margin-inline: 0.45em;
+}
+
+.spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock .NowBar .TimelineCredits .SongInfoSeparator {
+  margin-inline: 0.35em;
+}
+
+.spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock .NowBar .TimelineCredits .SongInfoSeparator.Comma {
+  margin-inline: 0 0.35em;
+}
+
+.spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock .NowBar .TimelineCredits .song-info-profile-section {
+  gap: 0.3em;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  border-radius: 0.25em;
+}
+
+/* Avatar between the role and the name, as in the lyrics' credits. */
+.spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock .NowBar .TimelineCredits .song-info-profile-section img {
+  order: 1;
+  width: 1.2em;
+  height: 1.2em;
+  margin: 0;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock .NowBar .TimelineCredits :is(.SongInfoName, .LyricsProviderViaLink, .CreditsValue a) {
+  order: 2;
+  color: var(--color-text-primary);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+  text-decoration-color: color-mix(in srgb, currentColor 35%, transparent);
+  transition: text-decoration-color var(--dur-fast) ease;
+}
+
+.spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock .NowBar .TimelineCredits .song-info-profile-section:is(:hover, :focus-visible) .SongInfoName,
+.spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock .NowBar .TimelineCredits .LyricsProviderViaLink:is(:hover, :focus-visible) {
+  text-decoration-color: currentColor;
+}
+
+.spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock .NowBar .TimelineCredits :is(.song-info-profile-section, .LyricsProviderViaLink):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock .NowBar .Timeline .TimelineCredits {
+    animation: none;
+  }
 }
 
 .spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock.Fullscreen .ContentBox .NowBar .CenteredView .Header .MediaBox .MediaContent .Heart {
@@ -522,4 +747,47 @@
   .spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock .ContentBox.LyricsHidden .NowBar .CenteredView .Header .MediaBox .MediaImageContainer {
     transition: opacity 0.2s ease !important;
   }
+}
+
+/* The No Lyrics notice starts below the view controls in the top corner, so its title never runs
+   under them. */
+.spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock .ContentBox .LyricsContainer .LyricsContent .LyricsNotice {
+  padding-top: max(8cqh, calc(var(--PD_ViewInset) + var(--PD_ViewSize) + 10px));
+}
+
+/* The skeleton's "Loading Lyrics" label sits at the bottom of the lyrics area, where the title and
+   artist rise to when the dock comes up. It sits that far higher, on the title's gutter. */
+.spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock .LyricsContainer .LyricsSkeleton .SkeletonStatus {
+  left: var(--PD_Gutter);
+  bottom: calc(1.1rem + var(--PD_Reserve));
+}
+
+/* Spicy Themes adds "Theme: <name>" and "Video synced by …" to the credits: into the community
+   credits when there are some, otherwise after the source. In the dock's one line they read as
+   parts of it, in its size and with its separators, instead of loose blocks in Spicy Themes'
+   own size and margins. */
+.spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock .NowBar .TimelineCredits :is(.st-theme-credit, .st-video-credit) {
+  display: flex;
+  align-items: center;
+  margin: 0 !important;
+  padding: 0;
+  font-size: inherit !important;
+  font-weight: inherit;
+  line-height: inherit;
+  white-space: nowrap;
+}
+
+.spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock .NowBar .TimelineCredits .SongInfo > :is(.st-theme-credit, .st-video-credit)::before {
+  content: "\00b7";
+  margin-inline: 0.45em;
+}
+
+/* The video credit's link reads like the other names in the line. */
+.spicy-pip-wrapper #SpicyLyricsPage.Exp_PopupDock .NowBar .TimelineCredits .st-video-credit a {
+  margin-left: 0.3em;
+  color: var(--color-text-primary);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+  text-decoration-color: color-mix(in srgb, currentColor 35%, transparent);
 }

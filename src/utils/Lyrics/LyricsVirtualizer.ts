@@ -8,7 +8,7 @@ import {
 import { Maid } from "../../modules/Maid.ts";
 import { Spring } from "../../modules/Spring.ts";
 import Logger from "../Logger.ts";
-import { $lyricsSize, $rendererVisualStyle, isBloomRenderer, $simpleLyricsMode, $smoothScrolling, $spaceGravityMode } from "../stores.ts";
+import { $calmBloomScroll, $lyricsSize, $rendererVisualStyle, isBloomRenderer, isLyricVideoRenderer, $scrollMotionBlur, $scrollMotionBlurMode, $simpleLyricsMode, $smoothScrolling, $spaceGravityMode, type ScrollMotionBlurMode } from "../stores.ts";
 import { $experiment, isExperimentEnabled } from "../experiments.ts";
 import { cancelCappedFrame, requestCappedFrame } from "../AnimationFrameLoop.ts";
 import { cubicBezier } from "./Animator/CubicBezier.ts";
@@ -118,6 +118,7 @@ const CASCADE_MAX_ELAPSED = 0.1;
 // Rows at and above the line go at once; each row below waits a little longer
 // than the one above it, up to the fourth.
 const BLOOM_SCROLL_EASE = cubicBezier(0.4, 0.1, 0, 1);
+const BLOOM_CALM_EASE = cubicBezier(0.22, 1, 0.36, 1);
 const BLOOM_ROW_DELAYS_MS = [25, 44, 56, 63];
 let bloomScrollMs = 750;
 
@@ -368,6 +369,74 @@ class LyricsVirtualizer {
   private _cascadeScroll = 0;
   private _cascadeRAF: number | null = null;
   private _cascadeLastTs: number | null = null;
+  private _motionBlurPx = 0;
+  private _motionBlurMode: ScrollMotionBlurMode | null = null;
+
+  private _getMotionBlurNode(doc: Document): SVGFEGaussianBlurElement | null {
+    const existing = doc.getElementById("sl-scroll-motion-blur-fe");
+    if (existing) return existing as unknown as SVGFEGaussianBlurElement;
+    const body = doc.body;
+    if (!body) return null;
+    const svgNS = "http://www.w3.org/2000/svg";
+    const svg = doc.createElementNS(svgNS, "svg");
+    svg.setAttribute("id", "sl-scroll-motion-blur-svg");
+    svg.setAttribute("width", "0");
+    svg.setAttribute("height", "0");
+    svg.setAttribute("aria-hidden", "true");
+    svg.style.cssText = "position:absolute;width:0;height:0;pointer-events:none;";
+    const defs = doc.createElementNS(svgNS, "defs");
+    const filter = doc.createElementNS(svgNS, "filter");
+    filter.setAttribute("id", "sl-scroll-motion-blur");
+    filter.setAttribute("x", "-10%");
+    filter.setAttribute("y", "-10%");
+    filter.setAttribute("width", "120%");
+    filter.setAttribute("height", "120%");
+    const fe = doc.createElementNS(svgNS, "feGaussianBlur");
+    fe.setAttribute("id", "sl-scroll-motion-blur-fe");
+    fe.setAttribute("in", "SourceGraphic");
+    fe.setAttribute("stdDeviation", "0 0");
+    filter.appendChild(fe);
+    defs.appendChild(filter);
+    svg.appendChild(defs);
+    body.appendChild(svg);
+    return fe;
+  }
+
+  private _setMotionBlur(pxPerSec: number): void {
+    const vc = this._virtualContainer;
+    if (!vc || !$scrollMotionBlur.get() || pxPerSec <= 25) {
+      if (this._motionBlurPx !== 0 && vc) {
+        vc.removeAttribute("data-motion-blur");
+        vc.style.removeProperty("--sl-scroll-blur");
+      }
+      this._motionBlurPx = 0;
+      this._motionBlurMode = null;
+      return;
+    }
+    const mode = $scrollMotionBlurMode.get();
+    const blur =
+      mode === "directional"
+        ? Math.min(9, Math.round(((pxPerSec - 25) / 50) * 2) / 2)
+        : Math.min(8, Math.round(((pxPerSec - 25) / 40) * 4) / 4);
+    if (blur === this._motionBlurPx && mode === this._motionBlurMode) return;
+    this._motionBlurPx = blur;
+    this._motionBlurMode = mode;
+    if (blur <= 0) {
+      vc.removeAttribute("data-motion-blur");
+      vc.style.removeProperty("--sl-scroll-blur");
+      return;
+    }
+    if (mode === "directional") {
+      const fe = this._getMotionBlurNode(vc.ownerDocument);
+      if (!fe) return;
+      fe.setAttribute("stdDeviation", `0 ${blur}`);
+      vc.style.removeProperty("--sl-scroll-blur");
+      vc.setAttribute("data-motion-blur", "directional");
+    } else {
+      vc.style.setProperty("--sl-scroll-blur", `${blur}px`);
+      vc.setAttribute("data-motion-blur", "smooth");
+    }
+  }
   // The retry chain in flight was started by a ripple scroll.
   private _cascadeChain = false;
   // The credits, provider and song info under the list are plain flow content,
@@ -655,7 +724,8 @@ class LyricsVirtualizer {
     if (Math.abs(shift) >= 0.5) {
       // Moving scrollTop under a scroll in flight would make it jump.
       this._stopSmoothScroll();
-      this._stopCascade();
+      const hadCascade = this._cascadeRows.size > 0;
+      if (!hadCascade) this._stopCascade();
       // Where each row on screen is seen now, mid-glide included.
       const seen = mounted.map((wrapper) => new DOMMatrixReadOnly(getComputedStyle(wrapper).transform).m42);
       const from = scrollEl.scrollTop;
@@ -665,6 +735,14 @@ class LyricsVirtualizer {
       v.scrollOffset = scrollEl.scrollTop;
       // What the scroll actually moved: it can be clamped at either end.
       const moved = scrollEl.scrollTop - from;
+      if (hadCascade) {
+        this._cascadeScroll += moved;
+        for (const [idx, row] of this._cascadeRows) {
+          row.goal += moved;
+          row.next += moved;
+          this._drawCascadeRow(idx, row);
+        }
+      }
       // The rows on screen move with the scroll, so nothing moves yet; the
       // glide below then starts from where each row is seen.
       mounted.forEach((wrapper, i) => {
@@ -886,6 +964,10 @@ class LyricsVirtualizer {
     scrollEl.closest<HTMLElement>(".LyricsContent")?.classList.toggle("LyricsScrollAtBottom", atBottom);
   };
 
+  syncPinnedFooter(): void {
+    this._updatePinnedFooterLayout();
+  }
+
   private _updatePinnedFooterLayout(): void {
     const virtualContainer = this._virtualContainer;
     if (!virtualContainer) return;
@@ -919,6 +1001,18 @@ class LyricsVirtualizer {
       ? this._pinnedFooterHeight
       : footerLayer.offsetHeight;
     if (observedFooter) this._pinnedFooterHeight = footerHeight;
+    // Center Lyrics: the footer's text centers in its own box, so that box has to be the
+    // lines' box. Its CSS insets use the same side-padding variables, but resolve cqw
+    // against a different container than the lines do, and the two drift apart in
+    // Fullscreen and Cinema View. Match them in pixels instead.
+    let centeredInset: { left: number; right: number } | null = null;
+    if (page.classList.contains("CenterLyrics")) {
+      const frame = (footerLayer.offsetParent as HTMLElement | null)?.getBoundingClientRect();
+      const lines = virtualContainer.getBoundingClientRect();
+      if (frame && lines.width > 0) {
+        centeredInset = { left: lines.left - frame.left, right: frame.right - lines.right };
+      }
+    }
     const trackBottom = footerHeight + PINNED_FOOTER_BOTTOM_OFFSET;
     // A one-line source stays compact; each additional wrapped footer line
     // widens the fade so lyrics do not abruptly meet the pinned block.
@@ -955,6 +1049,8 @@ class LyricsVirtualizer {
       }
     }
 
+    setPinnedFooterProperty(footerLayer, "left", centeredInset ? `${Math.round(centeredInset.left)}px` : "");
+    setPinnedFooterProperty(footerLayer, "right", centeredInset ? `${Math.round(centeredInset.right)}px` : "");
     setPinnedFooterProperty(lyricsContent, "--SL-PinnedFooterTrackBottom", `${Math.ceil(trackBottom)}px`);
     setPinnedFooterProperty(lyricsContent, "--SL-PinnedFooterFadeHeight", `${Math.ceil(fadeHeight)}px`);
     lyricsContent.classList.toggle("PinnedFooterSingleLine", singleLine);
@@ -1915,9 +2011,10 @@ class LyricsVirtualizer {
       this._smoothScrollToIndex(index, align, padding);
       return;
     }
+    const snapInstant = instant || isLyricVideoRenderer();
     // Bloom follows lines with the ripple, in place of either
     // kind of smooth scroll. The list itself moves instantly; the rows animate.
-    this._cascadeChain = !instant && this._refreshed;
+    this._cascadeChain = !snapInstant && this._refreshed;
     if (this._cascadeChain) {
       this._stopSmoothScroll();
       this._setConverging(true);
@@ -1925,13 +2022,13 @@ class LyricsVirtualizer {
       return;
     }
     this._stopCascade();
-    if (!instant && $smoothScrolling.get()) {
+    if (!snapInstant && $smoothScrolling.get()) {
       this._smoothScrollToIndex(index, align, padding);
       return;
     }
     this._stopSmoothScroll();
     this._setConverging(true);
-    this._scrollToIndexWithRetry(index, align, instant, padding, 0, null);
+    this._scrollToIndexWithRetry(index, align, snapInstant, padding, 0, null);
   }
 
   /**
@@ -2048,10 +2145,15 @@ class LyricsVirtualizer {
     this._cascadeLastTs = ts;
     const now = performance.now();
     const w = CASCADE_FREQUENCY * 2 * Math.PI;
+    let maxStepDelta = 0;
     for (const [idx, row] of this._cascadeRows) {
       if (row.tweenDur) {
+        const prevP = row.p;
         const u = Math.min(1, Math.max(0, (now - row.tweenAt!) / row.tweenDur));
-        row.p = row.tweenFrom! + (row.goal - row.tweenFrom!) * BLOOM_SCROLL_EASE(u);
+        const easeFn = $calmBloomScroll.get() ? BLOOM_CALM_EASE : BLOOM_SCROLL_EASE;
+        row.p = row.tweenFrom! + (row.goal - row.tweenFrom!) * easeFn(u);
+        const stepDelta = Math.abs(row.p - prevP);
+        if (stepDelta > maxStepDelta) maxStepDelta = stepDelta;
         if (u >= 1 && row.goal === this._cascadeScroll) {
           row.p = row.goal;
           this._drawCascadeRow(idx, row);
@@ -2065,9 +2167,12 @@ class LyricsVirtualizer {
         row.goal = row.next;
         row.at = 0;
       }
+      const prevP = row.p;
       for (let left = elapsed; left > 0; left -= CASCADE_MAX_STEP) {
         stepCascadeRow(row, Math.min(left, CASCADE_MAX_STEP), w);
       }
+      const stepDelta = Math.abs(row.p - prevP);
+      if (stepDelta > maxStepDelta) maxStepDelta = stepDelta;
       const home =
         row.at === 0 &&
         row.goal === this._cascadeScroll &&
@@ -2081,6 +2186,7 @@ class LyricsVirtualizer {
         this._drawCascadeRow(idx, row);
       }
     }
+    this._setMotionBlur(elapsed > 0 && this._cascadeRows.size > 0 ? maxStepDelta / elapsed : 0);
     if (this._cascadeRows.size > 0) this._cascadeRAF = requestCappedFrame(this._cascadeStep, this._window());
     else this._cascadeLastTs = null;
   };
@@ -2097,6 +2203,7 @@ class LyricsVirtualizer {
     }
     this._cascadeRows.clear();
     this._setTrailingOffset(0);
+    this._setMotionBlur(0);
     this._cascadeLastTs = null;
     this._cascadeChain = false;
   }
@@ -2334,7 +2441,8 @@ class LyricsVirtualizer {
       this._smoothLastTs === null ? 1 / 60 : Math.min((ts - this._smoothLastTs) / 1000, SMOOTH_SCROLL_MAX_ELAPSED);
     this._smoothLastTs = ts;
     const usual = this._smoothFrameAvg ?? raw;
-    let elapsed = Math.min(raw, Math.max(usual * 2, 1 / 60));
+    const stepDt = Math.min(raw, Math.max(usual * 2, 1 / 60));
+    let elapsed = stepDt;
     this._smoothFrameAvg = usual * 0.9 + raw * 0.1;
     let stepped = spring.Step(Math.min(elapsed, SMOOTH_SCROLL_MAX_STEP));
     elapsed -= SMOOTH_SCROLL_MAX_STEP;
@@ -2365,6 +2473,7 @@ class LyricsVirtualizer {
       this._smoothLastWhole = whole;
     }
     this._setSmoothFraction(fraction);
+    this._setMotionBlur(stepDt > 0 && Number.isFinite(moved) ? moved / stepDt : 0);
 
     // Same Wayland guard as the retry chain: a programmatic write may not
     // dispatch 'scroll', so push the offset into TanStack ourselves. This also
@@ -2442,6 +2551,7 @@ class LyricsVirtualizer {
     this._smoothLastWhole = null;
     this._smoothWindow = null;
     this._setSmoothFraction(0);
+    this._setMotionBlur(0);
     if (wasActive) this._setConverging(false);
     this._releaseGlideHold();
   }
@@ -2471,6 +2581,7 @@ class LyricsVirtualizer {
 
   private _layoutGlideEnabled(): boolean {
     return (
+      !isLyricVideoRenderer() &&
       ($smoothScrolling.get() || this._refreshed) &&
       performance.now() >= this._layoutGlideBlockedUntil
     );
@@ -2890,4 +3001,9 @@ export function romanizedRowsToggled(flip: () => void): void {
 
 export function triggerRemeasureLV(): void {
   lyricsVirtualizer.remeasure();
+}
+
+/** Re-lays out the pinned footer after a setting that moves it without resizing anything. */
+export function syncPinnedFooterLV(): void {
+  lyricsVirtualizer.syncPinnedFooter();
 }

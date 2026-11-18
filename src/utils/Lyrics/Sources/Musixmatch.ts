@@ -303,7 +303,8 @@ async function fetchMusixmatchMacro(
       ["q_artist", trackInfo.artist],
       ["q_artists", trackInfo.artist],
       ["q_track", trackInfo.title],
-      ["track_spotify_id", trackInfo.uri],
+      // A local file's URI names no Spotify track; the search goes on title, artist and length.
+      ...(trackInfo.uri.startsWith("spotify:local:") ? [] : [["track_spotify_id", trackInfo.uri]]),
       ["q_duration", String(trackInfo.durationMs / 1000)],
       ["f_subtitle_length", String(Math.floor(trackInfo.durationMs / 1000))],
       ["usertoken", token],

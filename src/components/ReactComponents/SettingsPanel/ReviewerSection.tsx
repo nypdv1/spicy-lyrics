@@ -31,6 +31,7 @@ const SETTING_LABELS: Record<string, string> = {
   syllableMerge: "Join Split Words",
   lineHoverBackground: "Line Hover Background",
   duetLinePadding: "Wide duet line padding",
+  centerLyrics: "Center Lyrics",
   creditsFollowLastLine: "Credits Follow the Last Singer",
   skipSpicyFont: "Skip Spicy Font",
   customFontEnabled: "Use Custom Font",

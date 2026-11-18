@@ -5,7 +5,12 @@ import {
   $scrollLeadEnabled,
   $scrollLeadMs,
   $seekFadeCompensation,
+  $showScrollToActiveButton,
   $rendererVisualStyle,
+  $calmBloomScroll,
+  $scrollMotionBlur,
+  $scrollMotionBlurMode,
+  type ScrollMotionBlurMode,
   $smoothScrolling,
   $staticAutoScroll,
   type StaticAutoScroll,
@@ -127,6 +132,61 @@ const groups: GroupDef[] = [
             onChange={(v) => $smoothScrolling.set(v)}
             disabled={disabled}
           />
+        ),
+      },
+      {
+        id: "calmBloomScroll",
+        label: "Calm Bloom Scrolling",
+        description: "Use a gentler bezier curve with a calmer, unhurried settle when Bloom scrolls between lines.",
+        keywords: "bloom smooth scroll bezier calm ease transition",
+        useDisabled: () =>
+          useStore($rendererVisualStyle) !== "bloom" && "Only applies with the Bloom renderer style.",
+        Control: ({ disabled, label }) => (
+          <Toggle
+            label={label}
+            checked={useStore($calmBloomScroll)}
+            onChange={(v) => $calmBloomScroll.set(v)}
+            disabled={disabled}
+          />
+        ),
+      },
+      {
+        id: "scrollMotionBlur",
+        label: "Scroll Motion Blur",
+        description: "Blur moving lyrics while scrolling between lines.",
+        keywords: "motion blur scroll bloom velocity",
+        Control: ({ label }) => (
+          <Toggle
+            label={label}
+            checked={useStore($scrollMotionBlur)}
+            onChange={(v) => $scrollMotionBlur.set(v)}
+          />
+        ),
+      },
+      {
+        id: "scrollMotionBlurMode",
+        label: "Motion Blur Style",
+        description: "Smooth uses a fast GPU blur; Directional stretches lines vertically like a camera streak (heavier).",
+        keywords: "motion blur style smooth directional vertical streak",
+        useDisabled: () => !useStore($scrollMotionBlur) && "Turn on Scroll Motion Blur to change this.",
+        Control: ({ disabled, label }) => (
+          <Select
+            label={label}
+            value={useStore($scrollMotionBlurMode)}
+            options={["smooth", "directional"]}
+            labels={["Smooth (Fast)", "Directional"]}
+            onChange={(v) => $scrollMotionBlurMode.set(v as ScrollMotionBlurMode)}
+            disabled={disabled}
+          />
+        ),
+      },
+      {
+        id: "showScrollToActiveButton",
+        label: "Show Scroll to Active Button",
+        description: "Show an arrow that jumps back to the line being sung when you've scrolled away from it.",
+        keywords: "jump back current line arrow button scrolled away",
+        Control: ({ label }) => (
+          <Toggle label={label} checked={useStore($showScrollToActiveButton)} onChange={(v) => $showScrollToActiveButton.set(v)} />
         ),
       },
       {

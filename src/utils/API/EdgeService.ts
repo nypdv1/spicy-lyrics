@@ -1,5 +1,5 @@
-// project/config has no imports of its own, so this keeps the module a leaf.
-import { ProjectVersion } from "../../../project/config.ts";
+// UpstreamVersion only imports project/config, so this keeps the module a leaf.
+import { getUpstreamVersion } from "./UpstreamVersion.ts";
 
 const EDGE_SERVICE_URL = "https://api.spicylyrics.org/bp/svc";
 const EDGE_INIT_URL = "https://api.spicylyrics.org/bp/init";
@@ -26,10 +26,10 @@ type EdgeToken = {
 let currentToken: EdgeToken | null = null;
 let pendingToken: Promise<EdgeToken | Response> | null = null;
 
-function versionHeader(): Record<string, string> {
-  // Same source as $spicyLyricsVersion, read here to avoid importing stores.
+async function versionHeader(): Promise<Record<string, string>> {
+  // Send the live upstream Spicy Lyrics version on API/edge requests, not the fork build version.
   return {
-    "SpicyLyrics-Version": (window as any)._spicy_lyrics_metadata?.LoadedVersion ?? ProjectVersion,
+    "SpicyLyrics-Version": await getUpstreamVersion(),
   };
 }
 
@@ -43,7 +43,7 @@ async function requestToken(timeoutMs: number): Promise<EdgeToken | Response> {
   const res = await fetch(`${EDGE_INIT_URL}?_=${Date.now()}`, {
     signal: AbortSignal.timeout(timeoutMs),
     cache: "no-store",
-    headers: versionHeader(),
+    headers: await versionHeader(),
   });
   if (!res.ok) return res;
 
@@ -89,11 +89,12 @@ async function tokenWithin(timeoutMs: number, signal: AbortSignal): Promise<Edge
   }
 }
 
-function fetchLookup(lookup: EdgeLookupName, signal: AbortSignal, token?: string): Promise<Response> {
+async function fetchLookup(lookup: EdgeLookupName, signal: AbortSignal, token?: string): Promise<Response> {
+  const baseHeaders = await versionHeader();
   return fetch(EdgeLookupUrl(lookup), {
     signal,
     cache: "no-store",
-    headers: token ? { ...versionHeader(), Authorization: `Bearer ${token}` } : versionHeader(),
+    headers: token ? { ...baseHeaders, Authorization: `Bearer ${token}` } : baseHeaders,
   });
 }
 

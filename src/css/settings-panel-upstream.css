@@ -306,6 +306,7 @@ sl-generic-modal.SpicyLyricsModal .sl-modal-overlay:has(.sl-us) {
     overflow-y: auto;
     overscroll-behavior: contain;
     padding: var(--space-2) 32px 32px;
+    will-change: scroll-position;
   }
 
   /* Only a pointer-driven tab change fades; see `instant` in index.tsx. */
@@ -903,6 +904,175 @@ sl-generic-modal.SpicyLyricsModal .sl-modal-overlay:has(.sl-us) {
     visibility: visible;
   }
 
+  /* Thin rounded scrollbars for the panel's own scrolling areas. Spotify sets
+     scrollbar-color on the root and it inherits; while it applies, Chromium ignores the
+     ::-webkit-scrollbar styles and draws Windows' classic bar with arrow buttons. */
+  :is(.sl-us-pane-scroll, .sl-us-sidebar, .sl-us-listbox, .sl-us-font-list) {
+    scrollbar-color: auto;
+
+    &::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    &::-webkit-scrollbar-button {
+      display: none;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      border: 2px solid transparent;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.22) padding-box;
+    }
+
+    &::-webkit-scrollbar-thumb:hover {
+      background-color: rgba(255, 255, 255, 0.34);
+    }
+  }
+
+  /* Font picker (FontPicker.tsx): the Select's button and sheet, with a search field on
+     top and a list that only renders the rows in view. */
+  .sl-us-font-trigger {
+    max-width: 220px;
+  }
+
+  .sl-us-font-trigger-value {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .sl-us-font-sheet {
+    position: fixed;
+    inset: auto;
+    margin: 0;
+    padding: 6px;
+    border: 0;
+    border-radius: var(--radius-md);
+    background: var(--sl-us-field-deep, #1d1830);
+    box-shadow:
+      inset 0 0 0 1px var(--hairline-strong),
+      0 14px 36px rgba(0, 0, 0, 0.5);
+    color: var(--color-text-secondary);
+    box-sizing: border-box;
+    transform-origin: top right;
+    opacity: 0;
+    transform: scale(0.96);
+    transition:
+      opacity 0.1s var(--ease-out),
+      transform 0.1s var(--ease-out),
+      overlay 0.1s allow-discrete,
+      display 0.1s allow-discrete;
+
+    &[data-placement="above"] {
+      transform-origin: bottom right;
+    }
+
+    &:popover-open {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      opacity: 1;
+      transform: none;
+      transition-duration: 0.16s;
+
+      @starting-style {
+        opacity: 0;
+        transform: scale(0.96);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      transform: none;
+    }
+  }
+
+  .sl-us-font-search {
+    flex: none;
+    height: 32px;
+
+    .sl-us-search {
+      font-size: var(--text-caption-size) !important;
+    }
+  }
+
+  .sl-us-font-list {
+    position: relative;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .sl-us-font-option {
+    position: absolute;
+    left: 0;
+    right: 0;
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 12px;
+    min-height: 0;
+    padding: 0 8px 0 10px;
+  }
+
+  .sl-us-font-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.9375rem;
+    font-weight: 400;
+    line-height: 1.3;
+  }
+
+  /* A row whose font is still loading, in the check's place. */
+  .sl-us-font-spinner {
+    width: 12px;
+    height: 12px;
+    box-sizing: border-box;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255, 255, 255, 0.18);
+    border-top-color: rgba(255, 255, 255, 0.7);
+    animation: sl-us-font-spin 0.7s linear infinite;
+
+    @media (prefers-reduced-motion: reduce) {
+      animation: sl-us-font-pulse 1.2s ease-in-out infinite alternate;
+    }
+  }
+
+  /* The chosen name on the button reads at one size, as the lyrics do (customFontSize.ts). */
+  .sl-us-font-trigger-value[style] {
+    font-size-adjust: 0.5;
+  }
+
+  /* A name drawn in its own font (fontSpecimens.ts), white, dimmed like the other options. */
+  .sl-us-font-specimen {
+    display: block;
+    opacity: 0.72;
+  }
+
+  .sl-us-font-option:is([data-active], [aria-selected="true"]) .sl-us-font-specimen {
+    opacity: 1;
+  }
+
+  /* The name as text beside its picture, for screen readers and finding it on the page. */
+  .sl-us-font-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .sl-us-font-empty {
+    padding: 14px 10px;
+    font-size: var(--text-caption-size) !important;
+    color: var(--color-text-tertiary);
+    text-align: center;
+  }
+
   /* Bipolar position slider — a recessed groove (matching the toggle's dark
      slot) with a fill that grows out from the centre tick toward the thumb,
      plus a value readout and an inline Reset. */
@@ -1218,6 +1388,13 @@ sl-generic-modal.SpicyLyricsModal .sl-modal-overlay:has(.sl-us) {
     opacity: 1;
   }
 
+
+  /* A button beside another control in one row, e.g. Manage next to a preset select. */
+  .sl-us-control-pair {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
 
   /* Inline action button (Reset, Clear, etc.) — flat tinted surface */
   .sl-us-btn {
@@ -1830,5 +2007,18 @@ sl-generic-modal.SpicyLyricsModal .sl-modal-overlay:has(.sl-us) {
   /* Presses keep their colour change and drop the scale. */
   sl-generic-modal.SpicyLyricsModal .sl-modal-overlay :is(.sl-us-tab, .sl-us-close):active {
     transform: none;
+  }
+}
+
+/* The font picker's loading spinner (FontPicker.tsx). */
+@keyframes sl-us-font-spin {
+  to {
+    rotate: 1turn;
+  }
+}
+
+@keyframes sl-us-font-pulse {
+  from {
+    opacity: 0.35;
   }
 }

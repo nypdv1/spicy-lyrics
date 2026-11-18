@@ -32,16 +32,18 @@ import {
   ScrollSimplebar,
 } from "../../utils/Scrolling/Simplebar/ScrollSimplebar.ts";
 import { toCssFontFamily } from "../../utils/cssFontFamily.ts";
+import { SyncCustomFontSize } from "../../utils/customFontSize.ts";
 import ApplyDynamicBackground, { KawarpMap, PAGE_BACKGROUND_KEY } from "../DynamicBG/dynamicBackground.ts";
 import {
   isBloomRenderer,
+  isLyricVideoRenderer,
   $creditsFollowLastLine,
   $currentLyricsData,
   $customFont,
   $customFontEnabled,
   $enableExperimentalWordSync,
-  $duetLinePadding,
   $staticSyncTarget,
+  $duetLinePadding,
   $lineHoverBackground,
   $memeFormat,
   $lyricsContainerExists,
@@ -50,6 +52,7 @@ import {
   $minimalLyricsMode,
   $pinnedFooterMode,
   $rightAlignLyrics,
+  $centerLyrics,
   $showScrollToActiveButton,
   $romanizationDisplay,
   $showVolumeSlider,
@@ -62,6 +65,7 @@ import {
   $syllablePace,
   $ttmlMakerMode,
   $viewControlsPosition,
+  $popupShowsCover,
 } from "../../utils/stores.ts";
 import Global from "../Global/Global.ts";
 import Session from "../Global/Session.ts";
@@ -88,6 +92,7 @@ import {
 import TransferElement from "../Utils/TransferElement.ts";
 import { SeatRomanizationToggle, SyncViewSwitch } from "../Utils/QueueView.ts";
 import { IsPIP, _IsPIP_after, ClosePopupLyrics } from "../Utils/PopupLyrics.ts";
+import { WatchDockCredits } from "../../utils/Lyrics/Applyer/Credits/DockCredits.ts";
 import { IsExternalCinemaLyrics, CloseExternalCinemaLyrics } from "../Utils/ExternalCinemaLyrics.ts";
 import { NPVCardOwnsPage, DeRenderNPVCard } from "../Utils/NPVLyrics.ts";
 import { CleanUpIsByCommunity } from "../../utils/Lyrics/Applyer/Credits/ApplyIsByCommunity.tsx";
@@ -104,6 +109,7 @@ import {
 import {
   lyricsSizeChanged,
   romanizedRowsToggled,
+  syncPinnedFooterLV,
   triggerRemeasureLV,
 } from "../../utils/Lyrics/LyricsVirtualizer.ts";
 import { $animatorPreset } from "../../utils/Lyrics/Animator/Tuning.ts";
@@ -236,6 +242,7 @@ function applyCustomFontSetting(fontFamily: string, targetDocument: Document = P
   } else {
     targetDocument.documentElement.style.removeProperty("--spicy-custom-font");
   }
+  SyncCustomFontSize(targetDocument);
   const page = PageContainer;
   if (page?.ownerDocument === targetDocument) {
     targetDocument.defaultView?.requestAnimationFrame(() => {
@@ -409,6 +416,7 @@ async function OpenPage(
 
   // Bloom, or Simple Lyrics Mode with its Refreshed look (isBloomRenderer).
   elem.classList.toggle("BloomRenderer", isBloomRenderer());
+  elem.classList.toggle("LyricVideoRenderer", isLyricVideoRenderer());
 
   if ($minimalLyricsMode.get()) {
     elem.classList.add("MinimalLyricsMode");
@@ -430,6 +438,7 @@ async function OpenPage(
   if ($creditsFollowLastLine.get()) {
     elem.classList.add("CreditsFollowLastLine");
   }
+  elem.classList.toggle("CenterLyrics", $centerLyrics.get());
 
   // Gates the raised .PlaybackControls / tightened .Heart offsets that make room for
   // the volume band — without it, turning the setting off would leave a gap.
@@ -440,6 +449,7 @@ async function OpenPage(
   ApplyExperimentClasses(elem);
   applyPinnedFooterMode(elem);
   ObservePinnedFooter(elem);
+  WatchDockCredits(elem);
 
   const contentBox = elem.querySelector<HTMLElement>(
     ".ContentBox"
@@ -550,6 +560,13 @@ export function Compactify(Element: HTMLElement | undefined = undefined) {
   if (!Fullscreen.IsOpen) return;
   const elem = Element ?? PageContainer;
   if (!elem) return;
+  // The popup is always in its own compact mode (ForcedCompactMode, set on open). Measured
+  // against its own small window it would also pass for a narrow main window, and the full-page
+  // compact sizes (huge lyrics, the title over them) would land on the Popup Player Dock.
+  if (IsPIP) {
+    elem.classList.remove("CompactifyEnabledCompactMode");
+    return;
+  }
   if (isSizeReadyToBeCompacted()) {
     elem.classList.add("CompactifyEnabledCompactMode");
     EnableCompactMode();
@@ -788,6 +805,12 @@ function AppendViewControls(ReAppend: boolean = false) {
               )
             : ""
         }
+        ${
+          // Popup only, with the dock (whose layout the cover needs): lyrics or the album cover.
+          IsPIP && isExperimentEnabled("popupDock")
+            ? toggle("PopupLyricsToggle", !$popupShowsCover.get(), Icons.Lyrics, Icons.Lyrics)
+            : ""
+        }
         ${toggle(
           "RomanizationToggle",
           isRomanized,
@@ -834,7 +857,7 @@ function AppendViewControls(ReAppend: boolean = false) {
               }>${Icons.ClearCache}</button>`
             : ""
         }
-        ${IsPIP ? "" : `<button id="SettingsToggle" class="ViewControl">${Icons.Settings}</button>`}
+        <button id="SettingsToggle" class="ViewControl">${Icons.Settings}</button>
         <button id="Close" class="ViewControl">${Icons.Close}</button>
     `;
   ApplyIconSwap(elem);
@@ -954,6 +977,22 @@ function AppendViewControls(ReAppend: boolean = false) {
       } catch (err) {
         controlsLogger.warn("Failed to setup Compact Mode tooltip", err);
       }
+    }
+
+    const popupLyricsToggle = elem.querySelector<HTMLElement>("#PopupLyricsToggle");
+    if (popupLyricsToggle) {
+      const showsLyrics = !$popupShowsCover.get();
+      // The popup can't host tooltips, so the label says what a press does.
+      const label = showsLyrics ? "Show the album cover" : "Show lyrics";
+      popupLyricsToggle.setAttribute("aria-label", label);
+      popupLyricsToggle.title = label;
+      // Without the grouped disc, the one glyph dims while the cover is shown.
+      if (!grouped) popupLyricsToggle.style.opacity = showsLyrics ? "" : "0.55";
+      popupLyricsToggle.addEventListener("click", () => {
+        if (grouped) PressToggle(popupLyricsToggle);
+        $popupShowsCover.set(!$popupShowsCover.get());
+        AppendViewControls();
+      });
     }
 
     const romanizationToggle = elem.querySelector("#RomanizationToggle");
@@ -1086,15 +1125,25 @@ function AppendViewControls(ReAppend: boolean = false) {
     }
 
     const settingsButton = elem.querySelector("#SettingsToggle");
-    if (settingsButton && !IsPIP) {
+    if (settingsButton) {
       try {
         if (!IsPIP) {
           Tooltips.Settings = createTooltip(settingsButton, {
             ...tippyProps(settingsButton),
             content: `Spicy Lyrics Settings`,
           });
+        } else {
+          // The popup can't host tooltips, so the label says what a press does.
+          settingsButton.setAttribute("aria-label", "Open settings in Spotify");
+          (settingsButton as HTMLElement).title = "Open settings in Spotify";
         }
         settingsButton.addEventListener("click", () => {
+          // The popup is too small for the panel: it opens in Spotify's window, brought forward.
+          if (IsPIP) {
+            openSettingsPanel(document);
+            globalThis.focus();
+            return;
+          }
           openSettingsPanel(PageContainer?.ownerDocument ?? document);
         });
       } catch (err) {
@@ -1185,6 +1234,7 @@ function rebuildLyrics() {
 
 function SyncBloomClass() {
   PageContainer?.classList.toggle("BloomRenderer", isBloomRenderer());
+  PageContainer?.classList.toggle("LyricVideoRenderer", isLyricVideoRenderer());
 }
 
 // The letter split, word springs and line timing are fixed when the lyrics are
@@ -1215,17 +1265,17 @@ $enableExperimentalWordSync.listen(() => {
   if (uri) fetchLyrics(uri).then(ApplyLyrics);
 });
 
-$syllableMerge.listen(rebuildLyrics);
-$syllablePace.listen(rebuildLyrics);
-// Rows under each line are built with romanization off too, so the toggle can
-// open them in place; switching to or from them always renders again.
-$romanizationDisplay.listen(rebuildLyrics);
 // Only unsynced lyrics change, and only while word sync is on.
 $staticSyncTarget.listen(() => {
   if (!PageContainer || !$enableExperimentalWordSync.get()) return;
   ReapplyCurrentLyrics();
 });
 
+$syllableMerge.listen(rebuildLyrics);
+$syllablePace.listen(rebuildLyrics);
+// Rows under each line are built with romanization off too, so the toggle can
+// open them in place; switching to or from them always renders again.
+$romanizationDisplay.listen(rebuildLyrics);
 
 // Synchronous, so romanizedRowsToggled sees the rows change inside its flip.
 $romanization.listen((v) => {
@@ -1285,6 +1335,13 @@ $duetLinePadding.listen((v) => {
 
 $creditsFollowLastLine.listen((v) => {
   PageContainer?.classList.toggle("CreditsFollowLastLine", v);
+});
+
+$centerLyrics.listen((v) => {
+  if (!PageContainer) return;
+  PageContainer.classList.toggle("CenterLyrics", v);
+  triggerRemeasureLV();
+  syncPinnedFooterLV();
 });
 
 $customFontEnabled.listen((v) => {

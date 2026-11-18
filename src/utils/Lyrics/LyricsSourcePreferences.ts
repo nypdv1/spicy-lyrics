@@ -3,6 +3,7 @@ export type LyricsSourceProviderId =
   | "musixmatch"
   | "apple"
   | "spotify"
+  | "unison"
   | "lrcred"
   | "lrclib"
   | "netease";
@@ -17,6 +18,7 @@ export const DEFAULT_LYRICS_SOURCE_ORDER: LyricsSourceProviderId[] = [
   "musixmatch",
   "apple",
   "spotify",
+  "unison",
   "lrcred",
   "lrclib",
   "netease",
@@ -46,6 +48,11 @@ export const LYRICS_SOURCE_PROVIDER_DEFINITIONS: Record<
     description:
       "Fetches official Spotify lyrics directly as a fallback when available.",
   },
+  unison: {
+    label: "Unison",
+    description:
+      "Community-synced lyrics from Unison (unison.betterlyrics.org), looked up by the song's ISRC, title and artist.",
+  },
   lrcred: {
     label: "lrc.red",
     description:
@@ -69,6 +76,7 @@ const LYRICS_SOURCE_LABELS: Record<string, string> = {
   aml: "Apple Music",
   spicy: "Spicy Lyrics",
   spotify: "Spotify",
+  unison: "Unison",
   lrcred: "lrc.red",
   lrclib: "LRCLIB",
   netease: "Netease",

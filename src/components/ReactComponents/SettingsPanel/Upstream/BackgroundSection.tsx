@@ -2,6 +2,8 @@ import { useStore } from "@nanostores/react";
 import {
   $backgroundBlur,
   $backgroundStyle,
+  $beatSyncBackground,
+  SetBackgroundStyle,
   $showNpvDynamicBg,
   BACKGROUND_STYLES,
   type BackgroundStyle,
@@ -45,7 +47,7 @@ const groups: GroupDef[] = [
             value={useStore($backgroundStyle)}
             options={[...BACKGROUND_STYLES]}
             labels={BACKGROUND_STYLES.map((style) => BACKGROUND_STYLE_LABELS[style])}
-            onChange={(v) => $backgroundStyle.set(v as BackgroundStyle)}
+            onChange={(v) => SetBackgroundStyle(v as BackgroundStyle)}
           />
         ),
       },
@@ -69,6 +71,25 @@ const groups: GroupDef[] = [
             defaultValue={0}
             unit="px"
             onChange={(v) => $backgroundBlur.set(v)}
+            disabled={disabled}
+          />
+        ),
+      },
+      {
+        id: "beatSyncBackground",
+        label: "Beat-Synced Background",
+        description: "Pulse the Dynamic (Kawarp) background on each beat using Spotify's beat map.",
+        keywords: "beat sync pulse kawarp dynamic reactive tempo music",
+        useDisabled: () => {
+          if (useStore($backgroundStyle) !== "dynamic") return "Only applies to Dynamic (Kawarp).";
+          if (!useStore($experiment("musicReactiveBackground"))) return "Turn on Music-Reactive Background in Experiments to use this.";
+          return false;
+        },
+        Control: ({ disabled, label }) => (
+          <Toggle
+            label={label}
+            checked={useStore($beatSyncBackground)}
+            onChange={(v) => $beatSyncBackground.set(v)}
             disabled={disabled}
           />
         ),

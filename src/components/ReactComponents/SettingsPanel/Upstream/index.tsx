@@ -2,13 +2,16 @@ import { useStore } from "@nanostores/react";
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { $experimentOverrides } from "../../../../utils/experiments.ts";
 import { $ttmlReviewer, isHeldByReviewer, REVIEWER_LOCK_REASON } from "../../../../utils/ttmlReviewer.ts";
+import { $lyricsRendererPaused, $rememberSettingsMenuLocation } from "../../../../utils/stores.ts";
+import { PAGE_BACKGROUND_KEY, SetKawarpSuspended } from "../../../DynamicBG/dynamicBackground.ts";
+import { $settingsMenuLocation } from "../../../../utils/uiState.ts";
 import { PopupModal } from "../../../Modal.ts";
 import About, { useUpdateStatus } from "./About.tsx";
 import { advancedSection } from "./AdvancedSection.tsx";
 import { appearanceSection } from "./AppearanceSection.tsx";
 import { backgroundSection } from "./BackgroundSection.tsx";
 import { BugReportPane, bugReportSection } from "./BugReportSection.tsx";
-import { Highlight, PeekContext, Row, SearchBar } from "./components.tsx";
+import { Highlight, PeekContext, Row, SearchBar, SettingsNavContext } from "./components.tsx";
 import { experimentsSection } from "./ExperimentsSection.tsx";
 import { AboutIcon, ChevronIcon, CloseIcon, PeekIcon } from "./icons.tsx";
 import { interfaceSection } from "./InterfaceSection.tsx";
@@ -50,6 +53,20 @@ const sectionById = (id: SectionId) => SECTIONS.find((s) => s.id === id) ?? SECT
 
 // Reopening the panel lands on the tab it was closed on, for the rest of the session.
 let lastTab: SectionId = SECTIONS[0].id;
+
+// With Remember Menu Location on, the tab survives a restart, not just a reopen.
+function initialTab(): SectionId {
+  if (!$rememberSettingsMenuLocation.get()) return lastTab;
+  const saved = $settingsMenuLocation.get().upstreamTab;
+  return SECTIONS.some((s) => s.id === saved) ? (saved as SectionId) : lastTab;
+}
+
+function rememberTab(id: SectionId) {
+  lastTab = id;
+  if ($rememberSettingsMenuLocation.get()) {
+    $settingsMenuLocation.set({ ...$settingsMenuLocation.get(), upstreamTab: id });
+  }
+}
 
 const notDisabled = () => false as const;
 
@@ -114,14 +131,16 @@ function search(query: string): SearchHit[] {
   });
 }
 
-export default function SettingsPanel() {
+export default function SettingsPanel({ onManageAnimator }: { onManageAnimator?: () => void } = {}) {
   // Experiments' rows are rebuilt from the overrides, so they re-render with them.
   useStore($experimentOverrides);
   const reviewerOn = useStore($ttmlReviewer);
 
   const [tab, setTab] = useState<SectionId>(() => {
-    sectionById(lastTab).onEnter?.();
-    return lastTab;
+    const first = initialTab();
+    lastTab = first;
+    sectionById(first).onEnter?.();
+    return first;
   });
   const [query, setQuery] = useState("");
   // Pointer-driven tab changes get a short fade. Keyboard changes and typing
@@ -141,6 +160,7 @@ export default function SettingsPanel() {
     }),
     []
   );
+  const nav = useMemo(() => ({ manageAnimator: onManageAnimator }), [onManageAnimator]);
   const rootRef = useRef<HTMLDivElement>(null);
   const groupRefs = useRef(new Map<string, HTMLDetailsElement>());
 
@@ -159,7 +179,7 @@ export default function SettingsPanel() {
   const select = (id: SectionId, viaKeyboard = false) => {
     if (id !== tab || searching) {
       if (id !== tab) sectionById(id).onEnter?.();
-      lastTab = id;
+      rememberTab(id);
       setTab(id);
       setQuery("");
       setInstant(viaKeyboard);
@@ -176,17 +196,24 @@ export default function SettingsPanel() {
   useLayoutEffect(() => {
     const overlay = rootRef.current?.closest(".sl-modal-overlay");
     if (!overlay || !peek) return;
+    const prevPaused = $lyricsRendererPaused.get();
+    $lyricsRendererPaused.set(false);
+    SetKawarpSuspended(PAGE_BACKGROUND_KEY, false);
     overlay.setAttribute("data-peek", peek.keep ? "row" : "all");
     peek.keep?.setAttribute("data-peek-keep", "");
     return () => {
+      $lyricsRendererPaused.set(prevPaused);
+      SetKawarpSuspended(PAGE_BACKGROUND_KEY, true);
       overlay.removeAttribute("data-peek");
       peek.keep?.removeAttribute("data-peek-keep");
     };
   }, [peek]);
 
   // A new page starts at its top.
-  useLayoutEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  useEffect(() => {
+    if (scrollRef.current && scrollRef.current.scrollTop !== 0) {
+      scrollRef.current.scrollTop = 0;
+    }
     headerRef.current?.removeAttribute("data-scrolled");
   }, [tab, searching]);
 
@@ -287,6 +314,7 @@ export default function SettingsPanel() {
   const Accessory = section.Accessory;
 
   return (
+    <SettingsNavContext.Provider value={nav}>
     <PeekContext.Provider value={peekControls}>
     <div className="sl-us" ref={rootRef}>
       <nav className="sl-us-sidebar" aria-label="Settings sections">
@@ -455,5 +483,6 @@ export default function SettingsPanel() {
       </section>
     </div>
     </PeekContext.Provider>
+    </SettingsNavContext.Provider>
   );
 }

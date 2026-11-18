@@ -1716,6 +1716,7 @@ sl-generic-modal.SpicyLyricsModal .slmodal-settingsPanel .sl-modal-main-section:
   overflow-y: auto;
   padding: 0 24px;
   scrollbar-gutter: stable both-edges;
+  will-change: scroll-position;
 }
 
 .sl-sp-settings-content {
@@ -1798,8 +1799,8 @@ sl-generic-modal.SpicyLyricsModal.Exp_NewSettingsDesign .sl-modal.slmodal-settin
    default.css, so opening and closing interpolate instead of snapping. */
 sl-generic-modal.SpicyLyricsModal.Exp_NewSettingsDesign .sl-modal.slmodal-settingsPanel::before {
   background-color: color-mix(in oklab, var(--sl-sp-field-deep) 14%, transparent);
-  -webkit-backdrop-filter: blur(40px) saturate(1.6);
-  backdrop-filter: blur(40px) saturate(1.6);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  backdrop-filter: blur(18px) saturate(1.4);
   box-shadow:
     inset 0 1px 0 color-mix(in oklab, var(--sl-sp-ink) 24%, transparent),
     inset 0 0 0 1px color-mix(in oklab, var(--sl-sp-ink) 16%, transparent),

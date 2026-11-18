@@ -21,8 +21,13 @@ import {
   $seekFadeCompensation,
   $scrollLeadEnabled,
   $scrollLeadMs,
+  $calmBloomScroll,
+  $scrollMotionBlur,
+  $scrollMotionBlurMode,
+  type ScrollMotionBlurMode,
   $smoothScrolling,
   $rightAlignLyrics,
+  $centerLyrics,
   $showScrollToActiveButton,
 } from "../../../utils/stores.ts";
 import { matches, Row, Select, SectionTitle, Slider, Toggle } from "./components.tsx";
@@ -40,12 +45,16 @@ interface Props { query: string; sectionFilter: string; showHidden?: boolean; }
 export default function LyricsSection({ query, sectionFilter, showHidden = false }: Props) {
   const minimalLyricsMode = useStore($minimalLyricsMode);
   const rightAlignLyrics = useStore($rightAlignLyrics);
+  const centerLyrics = useStore($centerLyrics);
   const showScrollToActiveButton = useStore($showScrollToActiveButton);
   const playbackOffset = useStore($playbackOffset);
   const seekFadeCompensation = useStore($seekFadeCompensation);
   const scrollLeadEnabled = useStore($scrollLeadEnabled);
   const scrollLeadMs = useStore($scrollLeadMs);
   const smoothScrolling = useStore($smoothScrolling);
+  const calmBloomScroll = useStore($calmBloomScroll);
+  const scrollMotionBlur = useStore($scrollMotionBlur);
+  const scrollMotionBlurMode = useStore($scrollMotionBlurMode);
   const lineHoverBackground = useStore($lineHoverBackground);
   const longWordThreshold = useStore($longWordThreshold);
   const syllableMerge = useStore($syllableMerge);
@@ -68,6 +77,7 @@ export default function LyricsSection({ query, sectionFilter, showHidden = false
 
   const visible = (id: string) => showHidden ? hiddenSettingIds.includes(id) : !allowHidingSettings || !hiddenSettingIds.includes(id) || Boolean(query.trim());
   const r3 = visible("lyrics-minimal-mode") && matches(query, "Minimal Lyrics Mode", "Hides sung lyrics lines in Fullscreen and Cinema Mode");
+  const center = visible("lyrics-center") && matches(query, "Center Lyrics", "Center every line instead of aligning it to the left.");
   const r4 = visible("lyrics-right-align") && matches(query, "Right Align Lyrics", "Flip duet/opposite lyric alignment.");
   const r5 = visible("lyrics-scroll-active") && matches(query, "Show Scroll to Active Button", "Show an arrow button when the active lyric is outside the viewport.");
   const r8 = visible("lyrics-playback-offset") && matches(query, "Playback Offset", "Shift lyrics timing earlier or later, in milliseconds.");
@@ -77,6 +87,9 @@ export default function LyricsSection({ query, sectionFilter, showHidden = false
   const early = visible("lyrics-early-scroll") && matches(query, "Early Scroll", "Start scrolling before the next lyric becomes active.");
   const lead = visible("lyrics-early-scroll-time") && matches(query, "Early Scroll Time", "How early the next line is scrolled to, in milliseconds.");
   const smooth = visible("lyrics-smooth-scrolling") && matches(query, "Smooth Scrolling", "Use spring motion for scrolling and interlude transitions.");
+  const calmBloom = visible("lyrics-calm-bloom-scroll") && matches(query, "Calm Bloom Scrolling", "Use a gentler bezier curve with a calmer settle in Bloom.");
+  const motionBlur = visible("lyrics-scroll-motion-blur") && matches(query, "Scroll Motion Blur", "Blur moving lyrics while scrolling between lines.");
+  const motionBlurMode = visible("lyrics-scroll-motion-blur-mode") && matches(query, "Motion Blur Style", "Smooth uses a fast GPU blur; Directional stretches lines vertically.");
   const skeleton = visible("lyrics-loading-skeleton") && matches(query, "Lyrics Loading Skeleton", "Show placeholder lines while lyrics load; disable to restore the spinner.");
   const credits = visible("lyrics-credits-follow-singer") && matches(query, "Credits Follow the Last Singer", "Align credits with the last duet line.");
   const joinSplit = visible("lyrics-syllable-merge") && matches(query, "Join Split Words", "Show a word sung in syllables as one word.");
@@ -102,7 +115,8 @@ export default function LyricsSection({ query, sectionFilter, showHidden = false
   return <>
     <SectionTitle>Lyrics Display</SectionTitle>
     {r3 && <Row settingId="lyrics-minimal-mode" label="Minimal Lyrics Mode" description="Hides sung lyrics lines in Fullscreen and Cinema Mode"><Toggle checked={minimalLyricsMode} onChange={(v) => $minimalLyricsMode.set(v)} /></Row>}
-    {r4 && <Row settingId="lyrics-right-align" label="Right Align Lyrics" description="Flip duet/opposite lyric alignment."><Toggle checked={rightAlignLyrics} onChange={(v) => $rightAlignLyrics.set(v)} /></Row>}
+    {center && <Row settingId="lyrics-center" label="Center Lyrics" description="Center every line instead of aligning it to the left. Duet lines are centered too."><Toggle checked={centerLyrics} onChange={(v) => $centerLyrics.set(v)} /></Row>}
+    {r4 && <Row settingId="lyrics-right-align" label="Right Align Lyrics" description="Flip duet/opposite lyric alignment." disabled={centerLyrics} disabledReason="Turn off Center Lyrics to change this."><Toggle checked={rightAlignLyrics} onChange={(v) => $rightAlignLyrics.set(v)} /></Row>}
     {r5 && <Row settingId="lyrics-scroll-active" label="Show Scroll to Active Button" description="Show an arrow when the active lyric is outside the viewport."><Toggle checked={showScrollToActiveButton} onChange={(v) => $showScrollToActiveButton.set(v)} /></Row>}
     {size && <Row settingId="lyrics-size" label="Lyrics Size" description="Make the lyrics bigger or smaller in every view, including romanization and background vocals. 100% is each view's usual size." stacked><Slider value={lyricsSize} min={60} max={200} step={5} defaultValue={100} unit="%" onChange={(v) => $lyricsSize.set(v)} /></Row>}
     {r8 && <Row settingId="lyrics-playback-offset" label={editingSong ? "Playback Offset, this song" : "Playback Offset"} description={offsetNote} labelAccessory={<Select value={editingSong ? "song" : "all"} options={currentUri && !reviewing ? ["all", "song"] : ["all"]} labels={currentUri && !reviewing ? ["All songs", "This song"] : ["All songs"]} onChange={(v) => $offsetScope.set(v as "all" | "song")} />} disabled={reviewing} disabledReason={REVIEWER_LOCK_REASON} stacked><Slider value={editingSong && currentUri ? songOffset : playbackOffset} min={-OFFSET_LIMIT_MS} max={OFFSET_LIMIT_MS} step={10} defaultValue={0} unit="ms" disabled={reviewing} onChange={(v) => (editingSong && currentUri ? setSongOffset(currentUri, v) : $playbackOffset.set(v))} /></Row>}
@@ -112,6 +126,9 @@ export default function LyricsSection({ query, sectionFilter, showHidden = false
     {lead && <Row settingId="lyrics-early-scroll-time" label="Early Scroll Time" description="How early to move to the next line." disabled={!scrollLeadEnabled} disabledReason="Enable Early Scroll to modify this setting" stacked><Slider value={scrollLeadMs} min={0} max={800} step={10} defaultValue={250} unit="ms" onChange={(v) => $scrollLeadMs.set(Math.max(0, Math.min(800, Math.round(v / 10) * 10)))} disabled={!scrollLeadEnabled} /></Row>}
     {staticScroll && <Row settingId="lyrics-static-autoscroll" label="Auto-scroll Unsynced Lyrics" description="Scroll lyrics without timing through the song. Basic skips quiet parts. Advanced follows the singing, falling back to Basic for songs Spotify has no voice data for. Either can drift on some songs."><Select value={staticAutoScroll} options={["off", "basic", "advanced"]} labels={["Off", "Basic", "Advanced"]} onChange={(v) => $staticAutoScroll.set(v as StaticAutoScroll)} /></Row>}
     {smooth && <Row settingId="lyrics-smooth-scrolling" label="Smooth Scrolling" description="Use spring motion for scrolling and interlude transitions."><Toggle checked={smoothScrolling} onChange={(v) => $smoothScrolling.set(v)} /></Row>}
+    {calmBloom && <Row settingId="lyrics-calm-bloom-scroll" label="Calm Bloom Scrolling" description="Use a gentler bezier curve with a calmer, unhurried settle when Bloom scrolls between lines."><Toggle checked={calmBloomScroll} onChange={(v) => $calmBloomScroll.set(v)} /></Row>}
+    {motionBlur && <Row settingId="lyrics-scroll-motion-blur" label="Scroll Motion Blur" description="Blur moving lyrics while scrolling between lines."><Toggle checked={scrollMotionBlur} onChange={(v) => $scrollMotionBlur.set(v)} /></Row>}
+    {motionBlurMode && <Row settingId="lyrics-scroll-motion-blur-mode" label="Motion Blur Style" description="Smooth uses a fast GPU blur; Directional stretches lines vertically like a camera streak (heavier)." disabled={!scrollMotionBlur} disabledReason="Enable Scroll Motion Blur to modify this setting"><Select value={scrollMotionBlurMode} options={["smooth", "directional"]} labels={["Smooth (Fast)", "Directional"]} onChange={(v) => $scrollMotionBlurMode.set(v as ScrollMotionBlurMode)} disabled={!scrollMotionBlur} /></Row>}
     {skeleton && <ExperimentSettings experimentIds={["lyricsSkeleton"]} showBuiltIn={false} />}
     {r9 && <Row settingId="lyrics-line-hover" label="Line Hover Background" description="Shows a highlight box behind a lyrics line when you hover over it"><Toggle checked={lineHoverBackground} onChange={(v) => $lineHoverBackground.set(v)} /></Row>}
     {r10 && <Row settingId="lyrics-wide-duet-padding" label="Wide duet line padding" description="Separate duet voices into wider columns. Disable for compact padding."><Toggle checked={duetLinePadding} onChange={(v) => $duetLinePadding.set(v)} /></Row>}

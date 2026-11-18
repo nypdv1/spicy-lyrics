@@ -1,9 +1,9 @@
 
 
-# iPixel Spicy Lyrics Dev Channel
+# Spicy Lyrics Fork
 
-> **This is an unofficial development build of Spicy Lyrics**, maintained by iPixelGalaxy (but imma be so fr, this is claude code doing all the heavy lifting, I'm just a guy with too many ideas).
-> It runs alongside the official version and gives you access to features before they ship to stable.
+> **This is an unofficial development build of Spicy Lyrics**, maintained by nypd / iPixelGalaxy.
+> It runs alongside the official version and gives you access to experimental features and tweaks before they ship to stable.
 
 ---
 
@@ -24,31 +24,31 @@ If you have Spicy Lyrics installed from the **Spicetify Marketplace**, uninstall
 ### Step 2 — Install this build manually
 
 1. Make sure [Spicetify](https://spicetify.app) is installed
-2. Download the extension file: **[spicy-lyrics-pixel.mjs](https://ipixelgalaxy.com/TempFiles/spicy-lyrics-pixel.mjs)**
+2. Download the extension entrypoint from `https://fork.rmmreviv.al/spicy-lyrics.mjs` (or `https://fork.nypd594.workers.dev/spicy-lyrics.mjs`)
 3. Move the file into your Spicetify Extensions directory
    - Find the correct path here: [spicetify.app — Manual Installation](https://spicetify.app/docs/customization/extensions#manual-installation)
    - Or run `spicetify config-dir` to open the path
 4. Run the following commands in your terminal:
    ```
-   spicetify config extensions spicy-lyrics-pixel.mjs
+   spicetify config extensions spicy-lyrics.mjs
    spicetify apply
    ```
 
 ---
 
-### Step 3 — Connect to the iPixel Dev build channel
+### Step 3 — Connect to the Fork build channel
 
-Once the plugin is loaded, you need to point it at the dev server:
+Once the plugin is loaded, you can point it at the fork build server:
 
 1. In Spotify, go to **Settings** (the cog icon in the top-right)
 2. Open **Spicy Lyrics Settings**, then open **Advanced**
 3. Find **Build Channel** at the top of the section and click **Manage**
 4. Click **Add Branch**
-5. Name it **`Canary`** or **`iPixel Dev`**
-6. Enter `ipixelgalaxy.com` as the **API Host**
+5. Name it **`Fork`** (or **`Dev`**)
+6. Enter `fork.rmmreviv.al` as the **API Host**
 7. Enable **Use the same host for both API and Storage**
 8. Click **Save Branch**
-9. Click **Switch** beside `iPixel Dev` — Spicy Lyrics reloads on the dev branch
+9. Click **Switch** beside `Fork` — Spicy Lyrics reloads on the fork branch
 
 ---
 
@@ -61,6 +61,12 @@ This build is designed to **coexist with the official Spicy Lyrics release**. If
 > Built on the `dev` branch. Features here may be unstable, incomplete, or subject to change before reaching the official release (if ever 💀, lowkey, this is just my playground).
 
 ## What's New
+
+## v0.1.0.257
+
+- **Dynamic upstream version for API requests**: Fetches and caches the live upstream version from `api.spicylyrics.org/version` for `SpicyLyrics-Version` headers and query payloads while keeping fork update checks on `0.1.0.x`.
+- **Scroll Motion Blur**: Added scroll velocity motion blur across all moving lyric lines with a **Motion Blur Style** selector (**Smooth (Fast)** GPU blur vs **Directional** vertical streak blur).
+- **Calm Bloom Scrolling**: Added a gentler, gap-aware bezier curve option for Bloom line transitions so scrolling settles smoothly without abrupt stops.
 
 ## v100.10.54
 

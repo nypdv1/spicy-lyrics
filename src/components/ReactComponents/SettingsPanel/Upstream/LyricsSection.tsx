@@ -1,5 +1,7 @@
 import { useStore } from "@nanostores/react";
+import { useContext } from "react";
 import {
+  $centerLyrics,
   $creditsFollowLastLine,
   $duetLinePadding,
   $lineHoverBackground,
@@ -12,6 +14,7 @@ import {
   $syllableMerge,
   $syllablePace,
   $restartVocalStutters,
+  $rightAlignLyrics,
   $spaceGravityMode,
   $memeFormat,
   $simpleLyricsMode,
@@ -22,7 +25,8 @@ import {
   type RomanizationDisplay,
   type SyllableMerge,
 } from "../../../../utils/stores.ts";
-import { Select, Slider, Toggle } from "./components.tsx";
+import { $animatorPreset, type AnimatorPreset } from "../../../../utils/Lyrics/Animator/Tuning.ts";
+import { Select, SettingsNavContext, Slider, Toggle } from "./components.tsx";
 import { LyricsIcon } from "./icons.tsx";
 import type { GroupDef, SectionDef } from "./model.ts";
 
@@ -75,7 +79,7 @@ const groups: GroupDef[] = [
         label: "Simple Lyrics Mode",
         description: "Choose how simple lyric transitions render.",
         keywords: "calculate animate transitions",
-        useDisabled: () => useStore($rendererVisualStyle) === "bloom" && "Only applies with the Spring renderer style.",
+        useDisabled: () => useStore($rendererVisualStyle) !== "spring" && "Only applies with the Spring renderer style.",
         Control: ({ disabled, label }) => {
           const enabled = useStore($simpleLyricsMode);
           const renderingType = useStore($simpleLyricsModeRenderingType);
@@ -98,6 +102,25 @@ const groups: GroupDef[] = [
             onChange={(v) => $rendererVisualStyle.set(v as RendererVisualStyle)}
           />
         ),
+      },
+      {
+        id: "animatorPreset",
+        label: "Animator Presets",
+        description: "How the Spring renderer moves words. Default matches upstream, Pixel keeps the Spicy Lyrics feel, and Custom uses your own tuning.",
+        keywords: "animator animation spring tuning pixel custom preset behavior",
+        useDisabled: () => useStore($rendererVisualStyle) !== "spring" && "Only applies with the Spring renderer style.",
+        Control: ({ disabled, label }) => {
+          const preset = useStore($animatorPreset);
+          const { manageAnimator } = useContext(SettingsNavContext);
+          return (
+            <span className="sl-us-control-pair">
+              {preset === "Custom" && manageAnimator && (
+                <button type="button" className="sl-us-btn" disabled={disabled} onClick={manageAnimator}>Manage</button>
+              )}
+              <Select label={label} disabled={disabled} value={preset} options={["Default", "Pixel", "Custom"]} onChange={(v) => $animatorPreset.set(v as AnimatorPreset)} />
+            </span>
+          );
+        },
       },
       {
         id: "minimalLyricsMode",
@@ -176,6 +199,21 @@ const groups: GroupDef[] = [
     title: "Lines",
     settings: [
       {
+        id: "centerLyrics",
+        label: "Center Lyrics",
+        description: "Center every line instead of aligning it to the left. Duet lines are centered too.",
+        keywords: "align alignment middle centre centered left",
+        Control: ({ label }) => <Toggle label={label} checked={useStore($centerLyrics)} onChange={(v) => $centerLyrics.set(v)} />,
+      },
+      {
+        id: "rightAlignLyrics",
+        label: "Right Align Lyrics",
+        description: "Swap which side each singer's lines sit on, so the main voice is on the right.",
+        keywords: "align alignment duet opposite flip side",
+        useDisabled: () => useStore($centerLyrics) && "Turn off Center Lyrics to change this.",
+        Control: ({ disabled, label }) => <Toggle label={label} disabled={disabled} checked={useStore($rightAlignLyrics)} onChange={(v) => $rightAlignLyrics.set(v)} />,
+      },
+      {
         id: "romanizationDisplay",
         label: "Romanization",
         description:
@@ -237,15 +275,18 @@ const groups: GroupDef[] = [
         description:
           "Keep the credits at the bottom of the lyrics while they scroll. No Writers pins the lyrics source and community line, Full pins the songwriters too.",
         keywords: "credits footer pin sticky written by songwriters provided by source community bottom",
-        Control: ({ label }) => (
+        Control: ({ label }) => {
+          const mode = useStore($pinnedFooterMode);
+          return (
           <Select
             label={label}
-            value={useStore($pinnedFooterMode) === "No Writers" ? "noWriters" : useStore($pinnedFooterMode) === "Full" ? "full" : "off"}
+            value={mode === "No Writers" ? "noWriters" : mode === "Full" ? "full" : "off"}
             options={["off", "noWriters", "full"]}
             labels={["Off", "No Writers", "Full"]}
             onChange={(v) => $pinnedFooterMode.set(v === "noWriters" ? "No Writers" : v === "full" ? "Full" : "Off")}
           />
-        ),
+          );
+        },
       },
     ],
   },

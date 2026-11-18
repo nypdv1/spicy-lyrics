@@ -213,10 +213,13 @@ export function LoadCanvasMedia(info: CanvasInfo): Promise<CanvasMedia | null> {
  * once every segment is buffered. The returned function detaches it again.
  */
 export async function AttachCanvasMedia(video: HTMLVideoElement, media: CanvasMedia): Promise<() => void> {
-  const mediaSource = new MediaSource();
-  const objectUrl = URL.createObjectURL(mediaSource);
+  // The video's own window: an object URL made in another (the main window, for a video in the
+  // popup) doesn't load there.
+  const view = (video.ownerDocument.defaultView ?? window) as typeof window;
+  const mediaSource = new view.MediaSource();
+  const objectUrl = view.URL.createObjectURL(mediaSource);
   const detach = () => {
-    URL.revokeObjectURL(objectUrl);
+    view.URL.revokeObjectURL(objectUrl);
     // A newer attach may own the element by now; clearing its source would leave it blank.
     if (video.src !== objectUrl) return;
     video.removeAttribute("src");

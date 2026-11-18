@@ -2,6 +2,7 @@ import { useStore } from "@nanostores/react";
 import {
   $disableNpvLyrics,
   $alwaysShowInFullscreen,
+  $autoQueueWhenNoLyrics,
   $animateFullscreenClose,
   $escapeKeyFunction,
   $openProfilesInBrowser,
@@ -9,11 +10,19 @@ import {
   $hideNowBarInCinema,
   $lockedMediaBox,
   $communityLyricsUseDisplayName,
+  $coverArtAnimation,
+  $canvasOnStage,
   $motionArtwork,
   $motionArtworkOnStage,
   $motionArtworkPriority,
   $nowBarForMovingArtwork,
   $popupLyricsAllowed,
+  $popupShowsCover,
+  $popupCoverArtwork,
+  $popupCoverWhenNoLyrics,
+  POPUP_COVER_ARTWORK_OPTIONS,
+  POPUP_COVER_ARTWORK_LABELS,
+  type PopupCoverArtwork,
   $releaseYearPosition,
   $removeSpotifyLyricsButton,
   $showNoLyricsNotice,
@@ -121,6 +130,15 @@ const groups: GroupDef[] = [
     title: "Fullscreen",
     settings: [
       {
+        id: "autoQueueWhenNoLyrics",
+        label: "Show Queue When There Are No Lyrics",
+        description: "In fullscreen and Cinema View, show the queue in place of a song's missing lyrics. Switching back to Lyrics keeps it closed for that song.",
+        keywords: "queue up next no lyrics cinema fullscreen automatic",
+        Control: ({ label }) => (
+          <Toggle label={label} checked={useStore($autoQueueWhenNoLyrics)} onChange={(v) => $autoQueueWhenNoLyrics.set(v)} />
+        ),
+      },
+      {
         id: "alwaysShowInFullscreen",
         label: "Always Show in Fullscreen",
         description: "Keep the fullscreen time or controls visible.",
@@ -162,6 +180,15 @@ const groups: GroupDef[] = [
   {
     title: "Album Artwork",
     settings: [
+      {
+        id: "coverArtAnimation",
+        label: "Cover Art Animation",
+        description: "Animate the cover art in the NowBar when the song changes.",
+        keywords: "album artwork cover transition change song nowbar",
+        Control: ({ label }) => (
+          <Toggle label={label} checked={useStore($coverArtAnimation)} onChange={(v) => $coverArtAnimation.set(v)} />
+        ),
+      },
       {
         id: "nowBarForMovingArtwork",
         label: "NowBar for Canvas and Motion Artwork",
@@ -212,6 +239,23 @@ const groups: GroupDef[] = [
             label={label}
             checked={useStore($motionArtworkOnStage)}
             onChange={(v) => $motionArtworkOnStage.set(v)}
+            disabled={disabled}
+          />
+        ),
+      },
+      {
+        id: "canvasOnStage",
+        label: "Spotify Canvas on Canvas Stage",
+        description: "Play songs' Spotify Canvas videos on the Canvas Stage. Off leaves the stage to motion artwork: a song with only a Canvas keeps its cover.",
+        keywords: "spotify canvas video stage disable off motion only animated cover",
+        useDisabled: () =>
+          !useStore($experiment("canvasImmersive")) &&
+          `Only applies with ${getExperiment("canvasImmersive").label} on, in Experiments.`,
+        Control: ({ disabled, label }) => (
+          <Toggle
+            label={label}
+            checked={useStore($canvasOnStage)}
+            onChange={(v) => $canvasOnStage.set(v)}
             disabled={disabled}
           />
         ),
@@ -278,6 +322,59 @@ const groups: GroupDef[] = [
             label={label}
             checked={useStore($popupLyricsAllowed)}
             onChange={(v) => $popupLyricsAllowed.set(v)}
+          />
+        ),
+      },
+      {
+        id: "popupShowsCover",
+        label: "Album Cover Instead of Lyrics in Popup",
+        description: "In the popup window, show the album cover where the lyrics would be, with the player docked below it. Needs the Popup Player Dock experiment.",
+        keywords: "popup mini player pip album cover art artwork hide lyrics",
+        useDisabled: () =>
+          !useStore($experiment("popupDock")) &&
+          `Only applies with ${getExperiment("popupDock").label} on, in Experiments.`,
+        Control: ({ disabled, label }) => (
+          <Toggle
+            label={label}
+            checked={useStore($popupShowsCover)}
+            onChange={(v) => $popupShowsCover.set(v)}
+            disabled={disabled}
+          />
+        ),
+      },
+      {
+        id: "popupCoverWhenNoLyrics",
+        label: "Album Cover When a Song Has No Lyrics",
+        description: "With lyrics on in the popup, a song with no lyrics shows the full-window album cover instead of the notice. The next song with lyrics brings them back.",
+        keywords: "popup mini player cover no lyrics missing notice automatic",
+        useDisabled: () =>
+          !useStore($experiment("popupDock")) &&
+          `Only applies with ${getExperiment("popupDock").label} on, in Experiments.`,
+        Control: ({ disabled, label }) => (
+          <Toggle
+            label={label}
+            checked={useStore($popupCoverWhenNoLyrics)}
+            onChange={(v) => $popupCoverWhenNoLyrics.set(v)}
+            disabled={disabled}
+          />
+        ),
+      },
+      {
+        id: "popupCoverArtwork",
+        label: "Popup Cover Animation",
+        description: "What plays on the popup's full-window album cover: the album's motion artwork, the song's Canvas (cropped to fill), one with the other as a fallback, or just the still cover.",
+        keywords: "popup mini player cover motion artwork animated canvas video priority",
+        useDisabled: () =>
+          !useStore($experiment("popupDock")) &&
+          `Only applies with ${getExperiment("popupDock").label} on, in Experiments.`,
+        Control: ({ disabled, label }) => (
+          <Select
+            label={label}
+            value={useStore($popupCoverArtwork)}
+            options={[...POPUP_COVER_ARTWORK_OPTIONS]}
+            labels={POPUP_COVER_ARTWORK_OPTIONS.map((o) => POPUP_COVER_ARTWORK_LABELS[o])}
+            onChange={(v) => $popupCoverArtwork.set(v as PopupCoverArtwork)}
+            disabled={disabled}
           />
         ),
       },

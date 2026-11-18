@@ -107,6 +107,8 @@ async function copyLyricsWindowStyles(targetWindow: Window, wrapperClass: string
   targetWindow.document.head.appendChild(layoutStyle);
   const customFont = document.documentElement.style.getPropertyValue("--spicy-custom-font");
   if (customFont) targetWindow.document.documentElement.style.setProperty("--spicy-custom-font", customFont);
+  const customFontAdjust = document.documentElement.style.getPropertyValue("--spicy-custom-font-adjust");
+  if (customFontAdjust) targetWindow.document.documentElement.style.setProperty("--spicy-custom-font-adjust", customFontAdjust);
 }
 
 async function closeSession(session: CinemaSession, closeWindow: boolean): Promise<void> {

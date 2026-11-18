@@ -73,7 +73,7 @@ interface SyllableData {
   // Continues visually, but starts a fresh word-timing animation after this part.
   RestartStutterAfter?: boolean;
   // One displayed word can replay through several originally separate timings.
-  RestartRanges?: Array<{ StartTime: number; EndTime: number }>;
+  RestartRanges?: Array<{ StartTime: number; EndTime: number; CueTime?: number }>;
   TransliteratedIsPartOfWord?: boolean;
   // A word joined from syllables keeps them here.
   Parts?: SyllableData[];
@@ -141,10 +141,61 @@ function renderableSyllables(
  * elements without merging their time ranges; every fragment then restarts its
  * own word animation while the line reads naturally as "Te-te-test".
  */
+const STUTTER_DASH_AT_END = /[-‐-―][^\p{L}\p{N}\s]*\s*$/u;
+
 function repairVocalStutters(syllables: SyllableData[]): SyllableData[] {
-  if (!$restartVocalStutters.get() || syllables.length < 2) return syllables;
+  if (!$restartVocalStutters.get()) return syllables;
+  // Stutters nest: `I-I got— I-I got— I-I got` stutters `I` inside each repeat
+  // of `I got`. Collapse the single words first, then find repeated phrases in
+  // what's left, so each phrase word keeps its own inner replays as well.
+  return findVocalStutters(findVocalStutters(splitInWordStutters(syllables), false), true);
+}
+
+// Some sources time a whole stutter as one word: `it-it`, `I-I-I`, `m-money`.
+// Split it at its dashes into separately timed pieces, sharing the word's time
+// by letter count, so it replays like a stutter timed word by word. Only when
+// every piece before the last starts the last one: `well-known` stays whole.
+function splitInWordStutters(syllables: SyllableData[]): SyllableData[] {
+  const dashSplit = (text: string) => text.split(/(?<=[-‐-―])/u);
+  const letters = (text: string) => text.normalize("NFKD").replace(/[^\p{L}\p{N}]/gu, "").toLocaleLowerCase();
+  return syllables.flatMap((syllable) => {
+    const pieces = dashSplit(syllable.Text ?? "");
+    if (pieces.length < 2) return [syllable];
+    const last = letters(pieces[pieces.length - 1]);
+    const heads = pieces.slice(0, -1).map(letters);
+    if (!last || heads.some((head) => !head || !last.startsWith(head))) return [syllable];
+    const weights = pieces.map((piece) => Math.max(1, letters(piece).length));
+    const total = weights.reduce((sum, weight) => sum + weight, 0);
+    const duration = syllable.EndTime - syllable.StartTime;
+    // A variant text keeps its matching piece, or is dropped if it splits differently.
+    const variant = (text: string | undefined, index: number) => {
+      if (text === undefined) return undefined;
+      const split = dashSplit(text);
+      return split.length === pieces.length ? split[index] : undefined;
+    };
+    let start = syllable.StartTime;
+    return pieces.map((piece, index) => {
+      const end = index === pieces.length - 1 ? syllable.EndTime : start + (duration * weights[index]) / total;
+      const part: SyllableData = {
+        ...syllable,
+        Text: piece,
+        TransliteratedText: variant(syllable.TransliteratedText, index),
+        GibberishText: variant(syllable.GibberishText, index),
+        StartTime: start,
+        EndTime: end,
+        IsPartOfWord: index === pieces.length - 1 ? syllable.IsPartOfWord : true,
+      };
+      start = end;
+      return part;
+    });
+  });
+}
+
+function findVocalStutters(syllables: SyllableData[], phrases: boolean): SyllableData[] {
+  if (syllables.length < 2) return syllables;
   const repaired = syllables.map((syllable) => ({ ...syllable }));
-  const dashAtEnd = /[-\u2010-\u2015]\s*$/u;
+  // A cut-off word can carry punctuation after its dash (`this\u2014?`, `go\u2014,`).
+  const dashAtEnd = STUTTER_DASH_AT_END;
   const dashOnly = /^\s*[-\u2010-\u2015]\s*$/u;
   const dashAtStart = /^\s*[-\u2010-\u2015]\s*/u;
   const lettersOnly = (text: string) => text.normalize("NFKD").replace(/[^\p{L}\p{N}]/gu, "").toLocaleLowerCase();
@@ -183,7 +234,7 @@ function repairVocalStutters(syllables: SyllableData[]): SyllableData[] {
     // its final timed word: `Wake` + `up—`, `wake` + `up—`, `wake` + `up`.
     // Find the shortest repeated token sequence ending in that dashed word.
     // We still join only across the dash, preserving the phrase's inner spaces.
-    if (!repeatsPrefix) {
+    if (!repeatsPrefix && phrases) {
       const maximumPhraseLength = Math.min(8, index + 1, repaired.length - targetIndex);
       for (let candidateLength = 2; candidateLength <= maximumPhraseLength; candidateLength++) {
         const prefixStart = index - candidateLength + 1;
@@ -292,7 +343,7 @@ function collapseVocalStutters(
         ...parts.slice(0, -1),
         {
           ...ending,
-          Text: (ending.Text ?? "").replace(/[-\u2010-\u2015]\s*$/u, ""),
+          Text: (ending.Text ?? "").replace(STUTTER_DASH_AT_END, ""),
           IsPartOfWord: syllables[last].IsPartOfWord,
           RestartRanges: replayRanges,
         }
@@ -301,14 +352,63 @@ function collapseVocalStutters(
       groupIndex++;
       continue;
     }
+    // `How this—`, `How this—`, `How this`: a repeated phrase keeps its words
+    // separate. Each word of the final repeat replays at the same word's cue
+    // in every earlier repeat, so `How` and `this` restart one after another.
+    const phraseLength = lastMatch.targetEnd - lastMatch.targetStart + 1;
+    const repeatsWordByWord = phraseLength > 1 && group.every((entry) =>
+      !entry.suffix &&
+      entry.prefixEnd - entry.prefixStart + 1 === phraseLength &&
+      entry.targetEnd - entry.targetStart + 1 === phraseLength
+    );
+    if (repeatsWordByWord) {
+      const repeatStarts = [group[0].prefixStart, ...group.map((entry) => entry.targetStart)];
+      const stripDashes = (text: string | undefined, first: boolean) => {
+        if (text === undefined) return undefined;
+        const trimmed = text.replace(STUTTER_DASH_AT_END, "");
+        return first ? trimmed.replace(/^\s*[-‐-―]\s*/u, "") : trimmed;
+      };
+      for (let wordIndex = 0; wordIndex < phraseLength; wordIndex++) {
+        const word = syllables[lastMatch.targetStart + wordIndex];
+        // CueTime is when that repeat's first word starts: the whole phrase
+        // goes back to unsung there, not each word only at its own cue. A word
+        // already stuttered inside a repeat (`I-I`) brings all its replays.
+        const ranges = repeatStarts.flatMap((start) => {
+          const part = syllables[start + wordIndex];
+          const CueTime = syllables[start].StartTime;
+          return (part.RestartRanges ?? [part]).map((range) => ({
+            StartTime: range.StartTime,
+            EndTime: range.EndTime,
+            CueTime,
+          }));
+        });
+        collapsed.push({
+          ...word,
+          Text: stripDashes(word.Text, wordIndex === 0) ?? "",
+          ...(word.TransliteratedText !== undefined
+            ? { TransliteratedText: stripDashes(word.TransliteratedText, wordIndex === 0) }
+            : {}),
+          ...(word.GibberishText !== undefined
+            ? { GibberishText: stripDashes(word.GibberishText, wordIndex === 0) }
+            : {}),
+          StartTime: ranges[0].StartTime,
+          EndTime: word.EndTime,
+          RestartRanges: ranges,
+        });
+      }
+      index = last;
+      groupIndex++;
+      continue;
+    }
+
     const display = syllables.slice(lastMatch.displayStart, lastMatch.displayEnd + 1);
     const final = display[display.length - 1];
     const stripDisplayStutterDashes = (text: string) =>
-      text.replace(/^\s*[-\u2010-\u2015]\s*/u, "").replace(/[-\u2010-\u2015]\s*$/u, "");
+      text.replace(/^\s*[-\u2010-\u2015]\s*/u, "").replace(STUTTER_DASH_AT_END, "");
     const joinPhraseText = (pick: (part: SyllableData) => string) =>
       stripDisplayStutterDashes(display.reduce(
         (joined, part, partIndex) =>
-          `${joined}${partIndex > 0 && !display[partIndex - 1].IsPartOfWord ? " " : ""}${pick(part).replace(/[-\u2010-\u2015]\s*$/u, "")}`,
+          `${joined}${partIndex > 0 && !display[partIndex - 1].IsPartOfWord ? " " : ""}${pick(part).replace(STUTTER_DASH_AT_END, "")}`,
         ""
       ));
     const text = joinPhraseText((part) => part.Text ?? "");
@@ -327,10 +427,12 @@ function collapseVocalStutters(
         : {}),
       StartTime: syllables[index].StartTime,
       EndTime: final.EndTime,
-      RestartRanges: phraseRanges.map(({ start, end }) => ({
-        StartTime: syllables[start].StartTime,
-        EndTime: syllables[end].EndTime,
-      })),
+      // A single word that was already collapsed keeps each of its replays.
+      RestartRanges: phraseRanges.flatMap(({ start, end }) =>
+        start === end && syllables[start].RestartRanges
+          ? syllables[start].RestartRanges!
+          : [{ StartTime: syllables[start].StartTime, EndTime: syllables[end].EndTime }]
+      ),
     });
     index = last;
     groupIndex++;
@@ -857,6 +959,7 @@ export function ApplySyllableLyrics(
             ...(lead.RestartRanges ? { RestartRanges: lead.RestartRanges.map((range) => ({
               StartTime: ConvertTime(range.StartTime),
               EndTime: ConvertTime(range.EndTime),
+              ...(range.CueTime !== undefined ? { CueTime: ConvertTime(range.CueTime) } : {}),
             })) } : {}),
           });
           tagWordLetters(plan.WordLetters);
@@ -973,6 +1076,7 @@ export function ApplySyllableLyrics(
                 ...(bw.RestartRanges ? { RestartRanges: bw.RestartRanges.map((range) => ({
                   StartTime: ConvertTime(range.StartTime),
                   EndTime: ConvertTime(range.EndTime),
+                  ...(range.CueTime !== undefined ? { CueTime: ConvertTime(range.CueTime) } : {}),
                 })) } : {}),
                 BGWord: true,
               });

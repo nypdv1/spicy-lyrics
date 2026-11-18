@@ -1,6 +1,7 @@
 import { atom, computed, type WritableAtom } from "nanostores";
 import { ProjectVersion } from "../../project/config.ts";
 import { SETTING_IDS } from "../components/ReactComponents/SettingsPanel/hiddenSettings.ts";
+import { isGoogleFont } from "./googleFonts.ts";
 
 export const SETTINGS_KEY = "SL:settings";
 
@@ -70,12 +71,14 @@ export function migrateRendererStyle(blob: Record<string, any>): boolean {
 
 // How the synced lyrics move. "spring" is the original renderer; "bloom" fills
 // each line behind one soft edge, swells held words letter by letter, and
-// follows the song with a staggered scroll.
-export type RendererVisualStyle = "spring" | "bloom";
-export const RENDERER_VISUAL_STYLES: readonly RendererVisualStyle[] = ["spring", "bloom"];
+// follows the song with a staggered scroll; "lyricVideo" centers one line at a
+// time over the Kawarp background.
+export type RendererVisualStyle = "spring" | "bloom" | "lyricVideo";
+export const RENDERER_VISUAL_STYLES: readonly RendererVisualStyle[] = ["spring", "bloom", "lyricVideo"];
 export const RENDERER_VISUAL_STYLE_LABELS: Record<RendererVisualStyle, string> = {
-  spring: "Spring (Default)",
-  bloom: "Bloom",
+  spring: "Spring",
+  bloom: "Bloom (Default)",
+  lyricVideo: "Lyric Video",
 };
 
 const _settings: Record<string, any> = migrateSettingsKeys(readSettingsBlob());
@@ -146,7 +149,14 @@ function readStaticBackgroundMode(): string {
   const styleModes: Record<string, string> = {
     dynamic: "off", artist: "artistHeader", cover: "coverArt", color: "color", none: "none",
   };
-  const sharedMode = styleModes[_settings.backgroundStyle] ?? _settings[STATIC_BACKGROUND_MODE_KEY];
+  const storedMode = _settings[STATIC_BACKGROUND_MODE_KEY];
+  // backgroundStyle can't tell Auto from Artist Header (both are "artist"), so the mode key wins
+  // when the two agree; when they don't, the shared key was set by another build and wins.
+  const sharedMode =
+    typeof storedMode === "string" &&
+    (_settings.backgroundStyle === undefined || backgroundStyleForMode(storedMode) === _settings.backgroundStyle)
+      ? storedMode
+      : styleModes[_settings.backgroundStyle] ?? storedMode;
   const remembersLegacy = _settings[PIXEL_LEGACY_BACKGROUND_KEY] === true;
   let effectiveMode = "default";
   let compatibleMode = sharedMode;
@@ -213,7 +223,27 @@ function backgroundStyleForMode(mode: string): BackgroundStyle {
   return "dynamic";
 }
 export const $backgroundStyle = computed($staticBackgroundMode, backgroundStyleForMode);
+
+/**
+ * Picks a background by style (the upstream settings design's list). $backgroundStyle is computed
+ * from $staticBackgroundMode, so setting it directly only changed the value in memory and was
+ * never saved; this sets the mode it stands for. Artist keeps Auto when that's the current mode.
+ */
+export function SetBackgroundStyle(style: BackgroundStyle): void {
+  const current = $staticBackgroundMode.get();
+  if (backgroundStyleForMode(current) === style && current !== "off") return;
+  const modes: Record<BackgroundStyle, string> = {
+    dynamic: "default",
+    legacy: "legacy",
+    artist: "artistHeader",
+    cover: "coverArt",
+    color: "color",
+    none: "none",
+  };
+  $staticBackgroundMode.set(modes[style] ?? "default");
+}
 export const $backgroundBlur = $staticBackgroundBlur;
+export const $beatSyncBackground = persistAtom<boolean>("beatSyncBackground", true);
 $staticBackgroundBlur.listen((value) => {
   _settings.backgroundBlur = value;
   saveSettingsBlob(_settings);
@@ -224,7 +254,7 @@ export const $simpleLyricsModeRenderingType = persistAtom<string>("simpleLyricsM
 export const $longWordThreshold = persistAtom<number>("longWordThreshold", 1500);
 // Lyrics text size as a percentage of what each view uses by default.
 export const $lyricsSize = persistAtom<number>("lyricsSize", 100);
-export const $rendererVisualStyle = persistAtom<RendererVisualStyle>("rendererVisualStyle", "spring");
+export const $rendererVisualStyle = persistAtom<RendererVisualStyle>("rendererVisualStyle", "bloom");
 // Simple Lyrics Mode with its Refreshed look on renders as Bloom too: Bloom grew out of that
 // look. experiments.ts supplies the check, since this module can't import it. Space Gravity
 // takes the lyrics over entirely, so neither applies while it's on.
@@ -232,8 +262,12 @@ let refreshedSimpleLyricsCheck = (): boolean => false;
 export function SetRefreshedSimpleLyricsCheck(check: () => boolean): void {
   refreshedSimpleLyricsCheck = check;
 }
+export const isLyricVideoRenderer = (): boolean =>
+  !$spaceGravityMode.get() && $rendererVisualStyle.get() === "lyricVideo";
 export const isBloomRenderer = (): boolean =>
-  !$spaceGravityMode.get() && ($rendererVisualStyle.get() === "bloom" || refreshedSimpleLyricsCheck());
+  !$spaceGravityMode.get() &&
+  !isLyricVideoRenderer() &&
+  ($rendererVisualStyle.get() === "bloom" || refreshedSimpleLyricsCheck());
 // Shown as "Fade Away Previous Lines"; the key keeps its old name.
 export const $minimalLyricsMode = persistAtom<boolean>("minimalLyricsMode", false);
 // Which words sung in syllables are shown as one word: none, all, those whose
@@ -272,6 +306,8 @@ export const $hideNpvLyricsWhenUnavailable = persistAtom<boolean>(
 // only the song info instead of the notice. Errors still show theirs. The NPV card
 // has its own switch above.
 export const $showNoLyricsNotice = persistAtom<boolean>("showNoLyricsNotice", true);
+// Fullscreen and Cinema View open the queue in the lyrics column for a song without lyrics.
+export const $autoQueueWhenNoLyrics = persistAtom<boolean>("autoQueueWhenNoLyrics", true);
 // Hide Spotify's own lyrics button in the playback bar (ours is left alone).
 export const $removeSpotifyLyricsButton = persistAtom<boolean>("removeSpotifyLyricsButton", false);
 export const $lockedMediaBox = persistAtom<boolean>("lockedMediaBox", false);
@@ -307,6 +343,7 @@ export const $lyricsCacheAction = persistAtom<string>(
   "all-current"
 );
 export const $rightAlignLyrics = persistAtom<boolean>("rightAlignLyrics", false);
+export const $centerLyrics = persistAtom<boolean>("centerLyrics", false);
 export const $escapeKeyFunction = persistAtom<string>("escapeKeyFunction", "Default");
 export const $buildChannel = persistAtom<string>("buildChannel", "Stable");
 export type PinnedFooterMode = "Off" | "No Writers" | "Full";
@@ -319,6 +356,19 @@ export const $customFont = persistAtom<string>("customFont", "");
 export type CustomFontSource = "google" | "system";
 // Existing custom-font values were installed/system fonts, so preserve that behavior by default.
 export const $customFontSource = persistAtom<CustomFontSource>("customFontSource", "system");
+// Each source keeps its own last choice, so switching the source brings that one back.
+// $customFont stays the font in use, the one everything else reads. A setup from before the
+// split seeds the source its font belongs to.
+const _legacyCustomFont = typeof _settings.customFont === "string" ? _settings.customFont : "";
+const _legacyIsGoogle = isGoogleFont(_legacyCustomFont);
+export const $customGoogleFont = persistAtom<string>("customGoogleFont", _legacyIsGoogle ? _legacyCustomFont : "");
+export const $customSystemFont = persistAtom<string>("customSystemFont", _legacyIsGoogle ? "" : _legacyCustomFont);
+function syncActiveCustomFont() {
+  const font = $customFontSource.get() === "google" ? $customGoogleFont.get() : $customSystemFont.get();
+  if ($customFont.get() !== font) $customFont.set(font);
+}
+for (const store of [$customFontSource, $customGoogleFont, $customSystemFont]) store.listen(syncActiveCustomFont);
+syncActiveCustomFont();
 export const $alwaysShowInFullscreen = persistAtom<string>("alwaysShowInFullscreen", "None");
 export const $showVolumeSliderFullscreen = persistAtom<string>("showVolumeSliderFullscreen", "Off");
 export const $releaseYearPosition = persistAtom<string>("releaseYearPosition", "Off");
@@ -329,6 +379,9 @@ export const $memeFormat = persistAtom<string>("memeFormat", "Off");
 export const $showScrollToActiveButton = persistAtom<boolean>("showScrollToActiveButton", true);
 export const $animateFullscreenClose = persistAtom<boolean>("animateFullscreenClose", false);
 export const $enableExperimentalWordSync = persistAtom<boolean>("enableExperimentalWordSync", false);
+// What Experimental Word Sync makes of unsynced lyrics: estimated word timing, or line timing only.
+export type StaticSyncTarget = "word" | "line";
+export const $staticSyncTarget = persistAtom<StaticSyncTarget>("staticSyncTarget", "word");
 export const $lyricsSourceOrder = persistAtom<string>(
   "lyricsSourceOrder",
   JSON.stringify(["spicy", "musixmatch", "apple", "spotify", "lrclib", "netease"])
@@ -346,11 +399,27 @@ export const $showVolumeSlider = persistAtom<boolean>("showVolumeSlider", false)
 // The album's animated cover, played over the still one when it has one.
 export const $motionArtwork = persistAtom<boolean>("motionArtwork", true);
 // With Canvas Stage on, what plays when a song has both a Canvas and motion artwork.
-// What Experimental Word Sync makes of unsynced lyrics: estimated word timing, or line timing only.
-export type StaticSyncTarget = "word" | "line";
-export const $staticSyncTarget = persistAtom<StaticSyncTarget>("staticSyncTarget", "word");
 export type MotionArtworkPriority = "motion" | "canvas";
 export const $motionArtworkPriority = persistAtom<MotionArtworkPriority>("motionArtworkPriority", "motion");
+// What plays on the popup's full-window cover: the album's motion artwork, the song's Canvas,
+// either with the other as a fallback, or just the still cover.
+export type PopupCoverArtwork = "motionFirst" | "canvasFirst" | "motion" | "canvas" | "off";
+export const POPUP_COVER_ARTWORK_OPTIONS: readonly PopupCoverArtwork[] = ["motionFirst", "canvasFirst", "motion", "canvas", "off"];
+export const POPUP_COVER_ARTWORK_LABELS: Record<PopupCoverArtwork, string> = {
+  motionFirst: "Motion Artwork, else Canvas",
+  canvasFirst: "Canvas, else Motion Artwork",
+  motion: "Motion Artwork Only",
+  canvas: "Canvas Only",
+  off: "Still Cover",
+};
+export const $popupCoverArtwork = persistAtom<PopupCoverArtwork>("popupCoverArtwork", "motionFirst");
+// With lyrics on in the popup, a song with no lyrics shows the full-window cover instead of the
+// notice, and the next song with lyrics brings them back.
+export const $popupCoverWhenNoLyrics = persistAtom<boolean>("popupCoverWhenNoLyrics", true);
+// The popup shows the album cover in the lyrics' place (with the Popup Player Dock).
+export const $popupShowsCover = persistAtom<boolean>("popupShowsCover", false);
+// Spotify Canvas videos may play on the Canvas Stage; off leaves the stage to motion artwork only.
+export const $canvasOnStage = persistAtom<boolean>("canvasOnStage", true);
 // Motion artwork may fill the Canvas Stage (while Canvas Stage is on); off keeps it on the NowBar cover.
 export const $motionArtworkOnStage = persistAtom<boolean>("motionArtworkOnStage", true);
 // Unsynced lyrics scroll through at the song's pace: "basic" follows loudness, "advanced" the voice.
@@ -378,6 +447,10 @@ export const $scrollLeadEnabled = persistAtom<boolean>("scrollLeadEnabled", fals
 export const $scrollLeadMs = persistAtom<number>("scrollLeadMs", 250);
 // Spring-driven auto-scroll instead of the browser's native smooth scroll.
 export const $smoothScrolling = persistAtom<boolean>("smoothScrolling", false);
+export const $calmBloomScroll = persistAtom<boolean>("calmBloomScroll", false);
+export type ScrollMotionBlurMode = "smooth" | "directional";
+export const $scrollMotionBlur = persistAtom<boolean>("scrollMotionBlur", true);
+export const $scrollMotionBlurMode = persistAtom<ScrollMotionBlurMode>("scrollMotionBlurMode", "smooth");
 // Frame rate cap for everything that redraws every frame (lyrics animation,
 // animated background, smooth-scroll glide). On high refresh rate displays every
 // extra frame is another repaint of the whole page, so this bounds the per-second

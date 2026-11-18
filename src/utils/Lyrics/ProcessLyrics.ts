@@ -18,6 +18,7 @@ import {
 import { isExperimentEnabled } from "../experiments.ts";
 import { KoreanCharReadings } from "./RomanizeKorean.ts";
 import { ChineseCharReadings, IsHan, JoinChineseReadings } from "./RomanizeChinese.ts";
+import { ExtractHiddenMakers } from "./HiddenMakers.ts";
 
 const romanizationLogger = new Logger("Lyrics Romanization");
 
@@ -452,6 +453,8 @@ export const JapaneseRomajiIsCurrent = (lyrics: any): boolean => {
  * caller can skip caching the result and try again next time.
  */
 export const ProcessLyrics = async (lyrics: any): Promise<boolean> => {
+  // First, so the invisible maker payload never reaches language detection or the letters.
+  ExtractHiddenMakers(lyrics);
   normalizeLegacyRomanizationFields(lyrics);
   NormalizeLyricsCommaSpacing(lyrics);
   StripEmptyLyricsLines(lyrics);

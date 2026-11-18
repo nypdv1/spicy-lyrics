@@ -1,4 +1,5 @@
 import Defaults, { isDev } from "../../components/Global/Defaults.ts";
+import { ClearDockCredits } from "./Applyer/Credits/DockCredits.ts";
 import { $currentLyricsData, $currentLyricsType, $currentlyFetching, $lrcRedAcceptModelSynced } from "../stores.ts";
 import { SpotifyPlayer } from "../../components/Global/SpotifyPlayer.ts";
 import PageView, { PageContainer } from "../../components/Pages/PageView.ts";
@@ -8,7 +9,7 @@ import Logger from "../Logger.ts";
 import { LocalLyricsManager } from "./manager/index.ts";
 import { ParseTTML } from "./manager/parseTTML.ts";
 import { GetExpireStore } from "../../modules/Store.ts";
-import { fetchLyricsFromProviders } from "./ExternalSources.ts";
+import { fetchLyricsFromProviders, LOCAL_FILE_SOURCES } from "./ExternalSources.ts";
 import {
   normalizeLyricsSourceOrder,
   type LyricsSourceProviderId,
@@ -31,7 +32,11 @@ export const LyricsStore = GetExpireStore<any>("SpicyLyrics_LyricsStore_g1", 6, 
 }, isDev as true);
 
 export const SessionTTMLStore = new Map<string, any>();
-const LYRICS_SOURCE_CACHE_VERSION = 4;
+// 5: plain lyrics from a preferred source no longer stop lrclib and netease from offering timed
+// ones, so results chosen under the old rule are looked up again.
+// 6: lrclib's word timing (Lyricsfile) can now beat a preferred source's line timing.
+// 7: lrc.red model syncs also lengthen a line's too-short final syllable.
+const LYRICS_SOURCE_CACHE_VERSION = 7;
 const inFlightLyricsFetches = new Map<string, Promise<[object | string, number] | null>>();
 export type FetchLyricsResult = [object | string, number] | null;
 export type LyricsFetchFailure = { uri: string; source: string; detail?: string };
@@ -323,11 +328,14 @@ async function fetchLyricsInternal(
     return presentStoredLyrics(uri, { ...localLyric, id: trackId });
   }
 
-  // Local files have no real track id (uri.split(":")[2] is the URL-encoded
-  // artist name), so they can't be looked up in LyricsStore or fetched from the
-  // API. Bail out here — after LocalLyricsManager.get() (which serves any
-  // user-uploaded TTML) but before the meaningless remote cache read.
-  if (isLocalTrack) {
+  // Local files have no Spotify track id or ISRC, so of the sources only those that search by
+  // title, artist and length can find them (LOCAL_FILE_SOURCES). Their lyrics are cached under
+  // the file's URI (trackId is the song key, which for a local file is its URI). With none of
+  // those sources turned on, it's the local file notice, which explains adding a TTML.
+  const sourceOrder = isLocalTrack
+    ? getActiveLyricsSourceOrder().filter((provider) => LOCAL_FILE_SOURCES.has(provider))
+    : getActiveLyricsSourceOrder();
+  if (isLocalTrack && sourceOrder.length === 0) {
     finishFetching(uri);
     HideLoaderContainer(uri);
     return ["local-track", 400];
@@ -371,7 +379,7 @@ async function fetchLyricsInternal(
     if (!isCurrentTrack(uri) || !(await backOffIfSwitchingFast()) || !isCurrentTrack(uri)) return null;
     const providerResult = await fetchLyricsFromProviders(
       uri,
-      getActiveLyricsSourceOrder(),
+      sourceOrder,
     );
     if (!isCurrentTrack(uri)) return null;
     if (providerResult?.status === 503) {
@@ -385,7 +393,8 @@ async function fetchLyricsInternal(
       noteFailure(uri, "API", "no provider returned lyrics");
       HideLoaderContainer(uri);
       finishFetching(uri);
-      return ["lyrics-not-found", 404];
+      // Nothing found for a local file: its own notice says how to add lyrics for it.
+      return isLocalTrack ? ["local-track", 400] : ["lyrics-not-found", 404];
     }
 
     const romanizedInFull = await ProcessLyrics(lyrics);
@@ -434,4 +443,5 @@ export function ClearLyricsPageContainer(): void {
     lyricsContent.innerHTML = "";
   }
   PageContainer?.querySelector<HTMLElement>(".LyricsContainer .LyricsPinnedFooter")?.replaceChildren();
+  ClearDockCredits();
 }

@@ -162,9 +162,12 @@ function parseTimestamp(value: string | null | undefined): number | null {
   const time = value.trim();
   if (!time) return null;
 
-  const frameClock = time.match(/^(?:(\d+):)?(\d{1,2}):(\d{1,2}):(\d+(?:\.\d+)?)$/);
+  // Frames only ever follow all three of hours, minutes and seconds (HH:MM:SS:FF). With the hours
+  // optional, a plain HH:MM:SS.fff such as lrc.red's line timings read as MM:SS:frames, and every
+  // time came out divided by the frame rate.
+  const frameClock = time.match(/^(\d+):(\d{1,2}):(\d{1,2}):(\d+(?:\.\d+)?)$/);
   if (frameClock) {
-    return Number(frameClock[1] ?? 0) * 3600 + Number(frameClock[2]) * 60 + Number(frameClock[3]) + Number(frameClock[4]) / timingContext.frameRate;
+    return Number(frameClock[1]) * 3600 + Number(frameClock[2]) * 60 + Number(frameClock[3]) + Number(frameClock[4]) / timingContext.frameRate;
   }
 
   const hmsMatch = time.match(

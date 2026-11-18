@@ -11,8 +11,9 @@ import type { SettingsSubPane } from "../components/ReactComponents/SettingsPane
 import Fullscreen from "../components/Utils/Fullscreen.ts";
 import type { SettingsPanelState } from "../components/ReactComponents/SettingsPanel/index.tsx";
 import { $settingsMenuLocation } from "./uiState.ts";
-import { $rememberSettingsMenuLocation } from "./stores.ts";
+import { $lyricsRendererPaused, $rememberSettingsMenuLocation } from "./stores.ts";
 import { $experiment } from "./experiments.ts";
+import { PAGE_BACKGROUND_KEY, SetKawarpSuspended } from "../components/DynamicBG/dynamicBackground.ts";
 
 const MODAL_ID = "settingsPanel";
 $experiment("newSettingsDesign").subscribe((enabled) => {
@@ -49,7 +50,8 @@ export function openSettingsPanel(targetDocument: Document = document) {
   const saveLocation = () => {
     captureScrollPosition();
     if ($rememberSettingsMenuLocation.get()) {
-      $settingsMenuLocation.set({ ...currentState, route: currentRoute });
+      // Spread the saved value first so the newer layout's tab, which it saves itself, is kept.
+      $settingsMenuLocation.set({ ...$settingsMenuLocation.get(), ...currentState, route: currentRoute });
     }
   };
   let previewEnteredFullscreen = false;
@@ -61,7 +63,18 @@ export function openSettingsPanel(targetDocument: Document = document) {
     previewEnteredFullscreen = false;
     if (Fullscreen.IsOpen) Fullscreen.Toggle(false);
   };
+  let wasLyricsPaused = $lyricsRendererPaused.get();
+  const pausePageForSettings = (paused: boolean) => {
+    SetKawarpSuspended(PAGE_BACKGROUND_KEY, paused);
+    if (paused) {
+      wasLyricsPaused = $lyricsRendererPaused.get();
+      $lyricsRendererPaused.set(true);
+    } else {
+      $lyricsRendererPaused.set(wasLyricsPaused);
+    }
+  };
   const closePanel = (root: ReactDOM.Root) => {
+    pausePageForSettings(false);
     saveLocation();
     root.unmount();
   };
@@ -73,6 +86,7 @@ export function openSettingsPanel(targetDocument: Document = document) {
     onStateChange: updateState,
   });
   const openAnimatorBehaviorPanel = (state: SettingsPanelState = currentState) => {
+    pausePageForSettings(false);
     currentState = state;
     currentRoute = "animator";
     if (!Fullscreen.IsOpen) { previewEnteredFullscreen = true; Fullscreen.Toggle(false); }
@@ -126,6 +140,7 @@ export function openSettingsPanel(targetDocument: Document = document) {
     });
   };
   const backToSettings = () => {
+    pausePageForSettings(true);
     const state = (openAnimatorBehaviorPanel as any).state as SettingsPanelState | undefined;
     currentState = state ?? currentState;
     currentRoute = "settings";
@@ -142,6 +157,7 @@ export function openSettingsPanel(targetDocument: Document = document) {
     targetDocument,
     createSettingsPanel()
   );
+  pausePageForSettings(true);
   PopupModal.display({
     title: "Settings",
     content: container,

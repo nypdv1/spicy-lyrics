@@ -11,6 +11,12 @@ export const PeekContext = React.createContext<{
   end: () => void;
 }>({ start: () => {}, end: () => {} });
 
+/**
+ * Pages the settings modal can move to from a row, such as the Animator Behavior
+ * editor. Supplied by whoever opened the panel; a row with no handler hides its button.
+ */
+export const SettingsNavContext = React.createContext<{ manageAnimator?: () => void }>({});
+
 export function Row({
   label,
   description,

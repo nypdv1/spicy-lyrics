@@ -22,15 +22,15 @@
   visibility: hidden;
   pointer-events: none;
   transition:
-    opacity 160ms var(--ease-out),
-    visibility 0s linear 160ms;
+    opacity 200ms var(--ease-out),
+    visibility 0s linear 200ms;
 }
 
 #SpicyLyricsPage .ContentBox .QueuePanel.Open {
   opacity: 1;
   visibility: visible;
   transition:
-    opacity 260ms var(--ease-out) 60ms,
+    opacity 320ms var(--ease-out) 60ms,
     visibility 0s;
 }
 
@@ -44,9 +44,44 @@
   anchor-name: --SL-QueueCover;
 }
 
+/* The list ends level with the song's artist line on the other side (under the cover, or in the
+   Canvas Stage's title band), fading out into it, rather than running on to the page's edge.
+   Not while the queue is open only: it keeps that length while it fades away. */
+#SpicyLyricsPage.Fullscreen .ContentBox .NowBar .Header .Metadata .ArtistsRow {
+  anchor-name: --SL-QueueArtists;
+}
+
+/* With the player under the cover (PlayerBelowCover.css), the list runs down level with the
+   player's last row instead: the volume bar when it's shown, the transport otherwise. */
+#SpicyLyricsPage.Fullscreen.Exp_PlayerBelowCover:not(.ShowVolumeSlider):not(.CompactMode, .ForcedCompactMode, .CanvasImmersive) .ContentBox .NowBar .CenteredView .Header .MediaBox .MediaContent .PlaybackControls,
+#SpicyLyricsPage.Fullscreen.ShowVolumeSlider.Exp_PlayerBelowCover:not(.CompactMode, .ForcedCompactMode, .CanvasImmersive) .ContentBox .NowBar .CenteredView .Header .MediaBox .MediaContent .VolumeControl {
+  anchor-name: --SL-QueuePlayerEnd;
+}
+
+/* A NowBar hidden in Cinema View is still laid out while it slides away; the list runs on. */
+:root:not(:fullscreen) #SpicyLyricsPage.Fullscreen.HideNowBarInCinema .ContentBox .NowBar .Header .Metadata .ArtistsRow,
+:root:not(:fullscreen) #SpicyLyricsPage.Fullscreen.HideNowBarInCinema .ContentBox .NowBar .MediaBox .MediaContent :is(.PlaybackControls, .VolumeControl) {
+  anchor-name: none;
+}
+
 @supports (anchor-name: --a) {
   #SpicyLyricsPage:not(.CompactMode, .ForcedCompactMode, .CanvasImmersive) .ContentBox .QueuePanel {
     top: max(72px, anchor(--SL-QueueCover top, 10cqh));
+  }
+
+  /* Without the NowBar (hidden in Cinema View) there's no artist line, and the list runs on. */
+  #SpicyLyricsPage:not(.CompactMode, .ForcedCompactMode) .ContentBox .QueuePanel {
+    bottom: anchor(--SL-QueueArtists bottom, 0px);
+  }
+
+  #SpicyLyricsPage.Fullscreen.Exp_PlayerBelowCover:not(.CompactMode, .ForcedCompactMode, .CanvasImmersive) .ContentBox .QueuePanel {
+    bottom: anchor(--SL-QueuePlayerEnd bottom, anchor(--SL-QueueArtists bottom, 0px));
+  }
+
+  #SpicyLyricsPage:not(.CompactMode, .ForcedCompactMode) .ContentBox .QueuePanel .QueueScroll {
+    padding-bottom: 3em;
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 0.75em, #000 calc(100% - 4.5em), transparent 100%);
+    mask-image: linear-gradient(to bottom, transparent 0, #000 0.75em, #000 calc(100% - 4.5em), transparent 100%);
   }
 
   /* Compact mode moves the lyrics under the cover header, and further down while the cover grows on
@@ -79,13 +114,30 @@
   min-height: 0;
   flex: 1;
   pointer-events: auto;
-  transform: translateY(8px);
-  transition: transform 160ms var(--ease-out);
+  /* Rises into place on the way in and drifts up on the way out, so the swap with the lyrics
+     reads as one motion instead of two fades. */
+  transform: translateY(16px) scale(0.985);
+  transform-origin: 50% 0;
+  transition: transform 200ms var(--ease-out);
+}
+
+#SpicyLyricsPage .ContentBox .QueuePanel.Leaving .QueueInner {
+  transform: translateY(-10px) scale(0.985);
+}
+
+/* The list sits in the middle of the column. With the Canvas Stage up, the artwork fills the
+   left, so the list keeps to the right edge, clear of it. */
+#SpicyLyricsPage .ContentBox .QueuePanel .QueueInner {
+  margin-inline: auto;
+}
+
+#SpicyLyricsPage.CanvasImmersive .ContentBox .QueuePanel .QueueInner {
+  margin-inline: auto 0;
 }
 
 #SpicyLyricsPage .ContentBox .QueuePanel.Open .QueueInner {
   transform: none;
-  transition: transform 320ms var(--ease-out) 60ms;
+  transition: transform 520ms var(--ease-out) 60ms;
 }
 
 /* The lyrics step aside while the queue is open. Their own transitions only matter while lyrics
@@ -96,15 +148,22 @@
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
+  /* The lyrics lift away as the queue rises in under them, and settle back down when it goes. */
+  translate: 0 -12px;
+  scale: 0.985;
   transition:
-    opacity 160ms var(--ease-out),
-    visibility 0s linear 160ms,
+    opacity 200ms var(--ease-out),
+    translate 260ms var(--ease-out),
+    scale 260ms var(--ease-out),
+    visibility 0s linear 200ms,
     margin-top 0.4s;
 }
 
 #SpicyLyricsPage:is(#SpicyLyricsPage).QueueClosing .ContentBox .LyricsContainer {
   transition:
-    opacity 280ms var(--ease-out) 80ms,
+    opacity 340ms var(--ease-out) 80ms,
+    translate 520ms var(--ease-out) 80ms,
+    scale 520ms var(--ease-out) 80ms,
     visibility 0s,
     margin-top 0.4s;
 }
@@ -731,8 +790,14 @@
 /* Reduced motion keeps the fades and drops the travel. */
 @media (prefers-reduced-motion: reduce) {
   #SpicyLyricsPage .ContentBox .QueuePanel .QueueInner,
+  #SpicyLyricsPage .ContentBox .QueuePanel.Leaving .QueueInner,
   #SpicyLyricsPage .ContentBox .QueuePanel.Open .QueueInner {
     transform: none;
+  }
+
+  #SpicyLyricsPage:is(#SpicyLyricsPage).QueueOpen .ContentBox .LyricsContainer {
+    translate: none;
+    scale: none;
   }
 
   #SpicyLyricsPage .QueuePanel :is(.QueuePlay, .QueueRemove, .QueueLike, .QueueClear, .QueueRetry):active {
@@ -946,6 +1011,93 @@
     scale 260ms var(--ease-out) 60ms,
     background-color 0.2s ease,
     visibility 0s;
+}
+
+/* The NowBar and exit seats are always open, at the corner end past the romanization toggle. */
+#SpicyLyricsPage .ViewSwitch :is(.ViewSwitchSeat_NowBar, .ViewSwitchSeat_Exit) {
+  width: calc(var(--ViewSwitchSize) * 1.2);
+  justify-content: flex-end;
+}
+
+#SpicyLyricsPage.NowBarSide__Right:not(.CompactMode, .ForcedCompactMode) .ViewSwitch :is(.ViewSwitchSeat_NowBar, .ViewSwitchSeat_Exit) {
+  justify-content: flex-start;
+}
+
+/* The side swap opens like the other seats, while there's a NowBar beside the lyrics: not while
+   it stands centred for a song without lyrics (LyricsHidden). */
+#SpicyLyricsPage.NowBarSide__Right:not(.CompactMode, .ForcedCompactMode) .ViewSwitch .ViewSwitchSeat_Swap {
+  justify-content: flex-start;
+}
+
+#SpicyLyricsPage .ViewSwitch .ViewSwitchSeat_Swap {
+  justify-content: flex-end;
+}
+
+#SpicyLyricsPage .ContentBox:not(.LyricsHidden) > .ViewSwitch.HasNowBar .ViewSwitchSeat_Swap {
+  width: calc(var(--ViewSwitchSize) * 1.2);
+  transition-delay: 0s;
+}
+
+/* Outranks the buttons' shared rule below, so the swap button keeps its own fade. */
+#SpicyLyricsPage .ContentBox > .ViewSwitch .ViewSwitchSwap {
+  opacity: 0;
+  scale: 0.8;
+  visibility: hidden;
+  transition:
+    opacity 120ms var(--ease-out),
+    scale 150ms var(--ease-out),
+    background-color 0.2s ease,
+    visibility 0s linear 150ms;
+}
+
+#SpicyLyricsPage .ContentBox:not(.LyricsHidden) > .ViewSwitch.HasNowBar .ViewSwitchSwap {
+  opacity: 1;
+  scale: 1;
+  visibility: visible;
+  transition:
+    opacity 180ms var(--ease-out) 110ms,
+    scale 260ms var(--ease-out) 60ms,
+    background-color 0.2s ease,
+    visibility 0s;
+}
+
+#SpicyLyricsPage .ViewSwitch :is(.ViewSwitchExit, .ViewSwitchNowBar, .ViewSwitchSwap) {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: var(--ViewSwitchSize);
+  height: var(--ViewSwitchSize);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.92);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+#SpicyLyricsPage .ViewSwitch :is(.ViewSwitchExit, .ViewSwitchNowBar, .ViewSwitchSwap) > svg {
+  width: 50%;
+  height: 50%;
+}
+
+#SpicyLyricsPage .ViewSwitch :is(.ViewSwitchExit, .ViewSwitchNowBar, .ViewSwitchSwap):focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+/* Shown, the NowBar's button keeps a soft disc, as a pressed toggle does elsewhere here. */
+#SpicyLyricsPage .ViewSwitch .ViewSwitchNowBar[aria-pressed="true"] {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  #SpicyLyricsPage .ViewSwitch :is(.ViewSwitchExit, .ViewSwitchNowBar, .ViewSwitchSwap):hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+  }
 }
 
 #SpicyLyricsPage .ViewSwitch .ViewSwitchScroll > svg {

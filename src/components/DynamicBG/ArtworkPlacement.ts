@@ -32,6 +32,8 @@ export type Placement = {
   cover: boolean;
   /** Waiting on the motion check: whatever shows now stays until it lands. */
   pending: boolean;
+  /** The popup's full-window cover plays the song's Canvas (PopupCanvas.ts). */
+  popupCanvas?: boolean;
 };
 
 /** Whether the outcome hinges on knowing up front that the album has motion artwork. */

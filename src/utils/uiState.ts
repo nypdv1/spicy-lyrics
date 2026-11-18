@@ -68,6 +68,8 @@ export const $settingsMenuLocation = persistAtom<{
   query: string;
   sectionFilter: string;
   scrollTop: number;
+  /** The tab the newer settings layout was on. */
+  upstreamTab?: string;
 }>("settingsMenuLocation", {
   route: "settings",
   query: "",

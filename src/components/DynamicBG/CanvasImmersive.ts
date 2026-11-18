@@ -1,5 +1,7 @@
 import "../../css/CanvasImmersive.css";
-import { $backgroundStyle, $motionArtworkOnStage, $motionArtworkPriority, $motionArtwork } from "../../utils/stores.ts";
+import { $backgroundStyle, $canvasOnStage, $hideNowBarInCinema, $motionArtworkOnStage, $motionArtworkPriority, $motionArtwork, $popupCoverArtwork } from "../../utils/stores.ts";
+import { PopupCoverActive } from "../../utils/Lyrics/LyricsNotice.ts";
+import { FailedPopupCanvas } from "./PopupCanvas.ts";
 import { isExperimentEnabled, onExperimentChange } from "../../utils/experiments.ts";
 import { onAnimationFrame } from "../../utils/AnimationFrameLoop.ts";
 import Logger from "../../utils/Logger.ts";
@@ -111,8 +113,11 @@ const playingTrackUri = (): string | null => Spicetify?.Player?.data?.item?.uri 
 /** Where the song's Canvas or motion artwork goes; `canvas-stage:change` fires when it may change.
  * While the stage still shows, nothing draws over its cover, which dissolves into it. */
 export function GetArtworkPlacement(): Placement {
+  if (PopupCoverActive()) return popupCoverPlacement();
   const stageEligible = !!mount && isEligible();
-  const info = stageEligible ? GetPlayingCanvasInfo() : null;
+  // With Canvas turned off for the stage, a song's Canvas counts as absent: motion artwork or the
+  // cover takes its place.
+  const info = stageEligible && $canvasOnStage.get() ? GetPlayingCanvasInfo() : null;
   const input = {
     stageEligible,
     canvas: !!info && info.fileId !== failedFileId,
@@ -130,6 +135,30 @@ export function GetArtworkPlacement(): Placement {
   }
   const placement = DecideArtworkPlacement({ ...input, motion });
   return active ? { ...placement, cover: false } : placement;
+}
+
+/**
+ * The popup's full-window cover (Album Cover Instead of Lyrics) has no stage: the motion artwork
+ * plays on the cover as usual, or the Canvas does (PopupCanvas.ts), by the popup's own choice.
+ * With one preferred and the other as a fallback, "motion first" waits on the motion check.
+ */
+function popupCoverPlacement(): Placement {
+  const choice = $popupCoverArtwork.get();
+  const info = GetPlayingCanvasInfo();
+  const canvas =
+    (choice === "canvas" || choice === "canvasFirst" || choice === "motionFirst") &&
+    !!info &&
+    info.fileId !== FailedPopupCanvas();
+  const motionAllowed = (choice === "motion" || choice === "motionFirst" || choice === "canvasFirst") && IsMotionArtworkEnabled();
+  if (!motionAllowed) return { stage: null, cover: false, pending: false, popupCanvas: canvas };
+  if (!canvas || choice === "motion") return { stage: null, cover: true, pending: false };
+  if (choice === "canvasFirst") return { stage: null, cover: false, pending: false, popupCanvas: true };
+  const albumId = PlayingAlbumId();
+  const motion = albumId ? RequestMotionVerdict(albumId) : "none";
+  if (motion === "pending") return { stage: null, cover: false, pending: true };
+  return motion === "available"
+    ? { stage: null, cover: true, pending: false }
+    : { stage: null, cover: false, pending: false, popupCanvas: true };
 }
 
 function clearHoldTimer() {
@@ -589,12 +618,20 @@ function transitionSideSwap(applySwap: () => void, to: "left" | "right"): boolea
   return true;
 }
 
+// Hide NowBar in Cinema View takes the NowBar off the page there (ContentBox.css: Cinema View is
+// the page's Fullscreen class without the document in fullscreen).
+const nowBarHiddenInCinema = (page: HTMLElement) =>
+  page.classList.contains("HideNowBarInCinema") &&
+  page.classList.contains("Fullscreen") &&
+  !page.ownerDocument.fullscreenElement;
+
 function isEligible(): boolean {
   return (
     isExperimentEnabled("canvasImmersive") &&
     !!PageContainer &&
     // With the NowBar away the stage is hidden, so the page goes back to the cover background.
     PageContainer.classList.contains("NowBarStatus__Open") &&
+    !nowBarHiddenInCinema(PageContainer) &&
     !IsCardMode &&
     !IsPIP &&
     !IsCompactMode() &&
@@ -817,11 +854,14 @@ Global.Event.listen("page:destroy", Unmount);
 Global.Event.listen("playback:songchange", () => void Refresh());
 Global.Event.listen("playback:playpause", syncPlayback);
 // Moving the page into or out of fullscreen re-parents it, which can pause the videos, and
-// rebuilds the NowBar, which moves the square.
+// rebuilds the NowBar, which moves the square. What the stage may show changes with it too: the
+// NowBar can have been closed or hidden in Cinema View, and leaving must bring the stage back.
 const onFullscreenChange = () =>
   setTimeout(() => {
-    syncPlayback();
-    if (mount && active) updateSquareTop(mount);
+    void Refresh().finally(() => {
+      syncPlayback();
+      if (mount && active) updateSquareTop(mount);
+    });
   }, 0);
 Global.Event.listen("fullscreen:open", onFullscreenChange);
 Global.Event.listen("fullscreen:exit", onFullscreenChange);
@@ -830,6 +870,8 @@ Global.Event.listen("compact-mode:enable", () => void Refresh());
 Global.Event.listen("compact-mode:disable", () => void Refresh());
 Global.Event.listen("nowbar:open", () => void Refresh());
 Global.Event.listen("nowbar:close", () => void Refresh());
+// After Fullscreen.ts has moved the page's HideNowBarInCinema class to match.
+$hideNowBarInCinema.listen(() => queueMicrotask(() => void Refresh()));
 onExperimentChange((experiment) => {
   if (experiment.id === "canvasImmersive") void Refresh();
 });
@@ -840,5 +882,5 @@ $backgroundStyle.listen(() => {
   void Refresh();
 });
 Global.Event.listen("motion-artwork:verdict", () => void Refresh());
-for (const store of [$motionArtwork, $motionArtworkPriority, $motionArtworkOnStage]) store.listen(() => void Refresh());
+for (const store of [$motionArtwork, $motionArtworkPriority, $motionArtworkOnStage, $canvasOnStage]) store.listen(() => void Refresh());
 SetSideSwapTransition(transitionSideSwap);

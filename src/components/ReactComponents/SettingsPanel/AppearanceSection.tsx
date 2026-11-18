@@ -5,10 +5,12 @@ import {
   $allowHidingSettings,
   $animationFpsCap,
   $animationFpsCapEnabled,
-  $customFont,
+  $customGoogleFont,
+  $customSystemFont,
   $customFontEnabled,
   $customFontSource,
   $showNpvDynamicBg,
+  $beatSyncBackground,
   $staticBackgroundBlur,
   $staticBackgroundMode,
   $hiddenSettingIds,
@@ -17,7 +19,7 @@ import {
 } from "../../../utils/stores.ts";
 import { matches, Row, SectionTitle, Select, Slider, Toggle } from "./components.tsx";
 import { ExperimentSettings } from "./ExperimentsPanel.tsx";
-import { GOOGLE_FONT_OPTIONS } from "../../../utils/googleFonts.ts";
+import { isGoogleFont } from "../../../utils/googleFonts.ts";
 import { FontPreviewPicker } from "./FontPreviewPicker.tsx";
 
 const SECTION_NAME = "Appearance";
@@ -43,11 +45,13 @@ interface Props {
 
 export default function AppearanceSection({ query, sectionFilter, showHidden = false }: Props) {
   const customFontEnabled = useStore($customFontEnabled);
-  const customFont = useStore($customFont);
+  const customGoogleFont = useStore($customGoogleFont);
+  const customSystemFont = useStore($customSystemFont);
   const customFontSource = useStore($customFontSource);
   const staticBackgroundMode = useStore($staticBackgroundMode);
   const canvasStageEnabled = useStore($experiment("canvasImmersive"));
   const staticBackgroundBlur = useStore($staticBackgroundBlur);
+  const beatSyncBackground = useStore($beatSyncBackground);
   const showNpvDynamicBg = useStore($showNpvDynamicBg);
   const pinnedFooterMode = useStore($pinnedFooterMode);
   const allowHidingSettings = useStore($allowHidingSettings);
@@ -70,6 +74,7 @@ export default function AppearanceSection({ query, sectionFilter, showHidden = f
   const r4 = visible("appearance-npv-background") && matches(query, "Display Dynamic Background in Now Playing View", "Show the animated background in the Now Playing panel.");
   const blurApplies = ["auto", "artistHeader", "coverArt"].includes(staticBackgroundMode);
   const r6 = visible("appearance-background-blur") && blurApplies && matches(query, "Background Blur", "Soften the static background image.");
+  const rBeat = visible("appearance-beat-sync-background") && matches(query, "Beat-Synced Background", "Pulse the Dynamic (Kawarp) background on each beat.");
   const r7 = visible("appearance-pinned-footer") && matches(query, "Pinned Lyrics Footer", "Keep source and community credits visible. Full also pins writers.");
   const r8 = visible("appearance-sliderbar-styling") && matches(query, "New SliderBar Styling", "New glass-like style for the SliderBar. Disable to revert back to the original one.");
   const r9 = visible("appearance-fps-limit") && matches(query, "Limit Animation Frame Rate", FPS_CAP_DESCRIPTION);
@@ -111,6 +116,11 @@ export default function AppearanceSection({ query, sectionFilter, showHidden = f
       {r7 && (
         <Row settingId="appearance-pinned-footer" label="Pinned Lyrics Footer" description="Keep source and community credits visible. Full also pins writers.">
           <Select value={pinnedFooterMode} options={["Off", "No Writers", "Full"]} onChange={(value) => $pinnedFooterMode.set(value as typeof pinnedFooterMode)} />
+        </Row>
+      )}
+      {rBeat && (
+        <Row settingId="appearance-beat-sync-background" label="Beat-Synced Background" description="Pulse the Dynamic (Kawarp) background on each beat using Spotify's beat map.">
+          <Toggle checked={beatSyncBackground} onChange={(v) => $beatSyncBackground.set(v)} />
         </Row>
       )}
       {r4 && (
@@ -156,13 +166,13 @@ export default function AppearanceSection({ query, sectionFilter, showHidden = f
 
       {r2a && (
         <Row label="Google Font" description="Browse Google Fonts with live previews. The selected font loads through coolLabs Fonts.">
-          <FontPreviewPicker disabled={!customFontEnabled} source="google" value={GOOGLE_FONT_OPTIONS.includes(customFont as typeof GOOGLE_FONT_OPTIONS[number]) ? customFont : ""} onChange={(value) => $customFont.set(value)} />
+          <FontPreviewPicker disabled={!customFontEnabled} source="google" value={isGoogleFont(customGoogleFont) ? customGoogleFont : ""} onChange={(value) => $customGoogleFont.set(value)} />
         </Row>
       )}
 
       {r2b && (
         <Row label="System Font" description="Browse installed fonts with live previews.">
-          <FontPreviewPicker disabled={!customFontEnabled} source="system" value={customFont} onChange={(value) => $customFont.set(value)} />
+          <FontPreviewPicker disabled={!customFontEnabled} source="system" value={customSystemFont} onChange={(value) => $customSystemFont.set(value)} />
         </Row>
       )}
 

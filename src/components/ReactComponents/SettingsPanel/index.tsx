@@ -8,5 +8,7 @@ export type { SettingsPanelState } from "./LegacyPanel.tsx";
 
 export default function SettingsPanel(props: React.ComponentProps<typeof LegacyPanel>) {
   const useUpstreamLayout = useStore($useUpstreamSettingsLayout);
-  return useUpstreamLayout ? <UpstreamSettingsPanel /> : <LegacyPanel {...props} />;
+  return useUpstreamLayout
+    ? <UpstreamSettingsPanel onManageAnimator={props.onManageAnimator && (() => props.onManageAnimator?.(props.initialState ?? { query: "", sectionFilter: "Appearance", scrollTop: 0 }))} />
+    : <LegacyPanel {...props} />;
 }

@@ -15,6 +15,7 @@ type VersionParsedData =
       Major: number;
       Minor: number;
       Patch: number;
+      Build?: number;
     }
   | undefined;
 
@@ -65,7 +66,7 @@ const Session = {
   },
   SpicyLyrics: {
     ParseVersion: (version: string): VersionParsedData => {
-      const versionMatches = version.match(/(\d+)\.(\d+)\.(\d+)/);
+      const versionMatches = version.match(/(\d+)\.(\d+)\.(\d+)(?:\.(\d+))?/);
 
       if (versionMatches === null) {
         return undefined;
@@ -77,6 +78,7 @@ const Session = {
         Major: parseInt(versionMatches[1]),
         Minor: parseInt(versionMatches[2]),
         Patch: parseInt(versionMatches[3]),
+        Build: versionMatches[4] !== undefined ? parseInt(versionMatches[4]) : 0,
       };
     },
     GetCurrentVersion: (): VersionParsedData => {
@@ -94,6 +96,9 @@ const Session = {
       if (a.Major !== b.Major) return a.Major > b.Major ? 1 : -1;
       if (a.Minor !== b.Minor) return a.Minor > b.Minor ? 1 : -1;
       if (a.Patch !== b.Patch) return a.Patch > b.Patch ? 1 : -1;
+      const aBuild = a.Build ?? 0;
+      const bBuild = b.Build ?? 0;
+      if (aBuild !== bBuild) return aBuild > bBuild ? 1 : -1;
       return 0;
     },
     /**

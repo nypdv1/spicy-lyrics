@@ -1,4 +1,5 @@
 import {
+  $calmBloomScroll,
   $currentLyricsType,
   $lyricsContainerExists,
   $lyricsRendererPaused,
@@ -7,6 +8,7 @@ import {
   $scrollLeadMs,
   $smoothScrolling,
   $staticAutoScroll,
+  isLyricVideoRenderer,
 } from "../../utils/stores.ts";
 import { GetStaticPace, type StaticPace } from "./StaticPace.ts";
 import Global from "../../components/Global/Global.ts";
@@ -403,6 +405,7 @@ export function InitializeScrollEvents(ScrollSimplebar: any) {
  * pause, and starts that long before the line so it arrives as it's sung.
  */
 const BloomScroll = { MinMs: 480, MaxMs: 750, GapFromMs: 200, GapToMs: 750 };
+const CalmBloomScroll = { MinMs: 950, MaxMs: 1900, GapFromMs: 150, GapToMs: 1900 };
 
 // Where a line's own singing ends. Fade Away Previous Lines stretches EndTime
 // to the next line; LeadEndTime keeps the real end.
@@ -416,6 +419,7 @@ const GetBloomScroll = (
   Lines: LyricsLine[] | LyricsSyllable[],
   position: number
 ): { Ms: number; LeadMs: number } => {
+  const cfg = $calmBloomScroll.get() ? CalmBloomScroll : BloomScroll;
   let next = -1;
   for (let i = 0; i < Lines.length; i++) {
     if (!IsBGLine(Lines[i]) && Lines[i].StartTime > position) {
@@ -423,7 +427,7 @@ const GetBloomScroll = (
       break;
     }
   }
-  if (next < 0) return { Ms: BloomScroll.MaxMs, LeadMs: 0 };
+  if (next < 0) return { Ms: cfg.MaxMs, LeadMs: 0 };
   let prevEnd = -Infinity;
   for (let i = next - 1; i >= 0; i--) {
     const end = GetLeadEndTime(Lines[i]);
@@ -431,9 +435,9 @@ const GetBloomScroll = (
     if (!IsBGLine(Lines[i])) break;
   }
   const room = Lines[next].StartTime - prevEnd;
-  const gap = Math.min(BloomScroll.GapToMs, Math.max(BloomScroll.GapFromMs, room));
-  const share = (gap - BloomScroll.GapFromMs) / (BloomScroll.GapToMs - BloomScroll.GapFromMs);
-  const ms = Math.round(BloomScroll.MinMs + (BloomScroll.MaxMs - BloomScroll.MinMs) * share);
+  const gap = Math.min(cfg.GapToMs, Math.max(cfg.GapFromMs, room));
+  const share = (gap - cfg.GapFromMs) / (cfg.GapToMs - cfg.GapFromMs);
+  const ms = Math.round(cfg.MinMs + (cfg.MaxMs - cfg.MinMs) * share);
   return { Ms: ms, LeadMs: Math.min(ms, Math.max(0, room)) };
 };
 
@@ -451,6 +455,25 @@ const SetBloomFocus = (el: HTMLElement | null) => {
 const GetScrollLine = (Lines: LyricsLine[] | LyricsSyllable[], ProcessedPosition: number) => {
   if ($currentLyricsType.get() === "Static" || $currentLyricsType.get() === "None" || !Lines)
     return;
+  if (isLyricVideoRenderer()) {
+    let leadIndex: number | null = null;
+    let musicalIndex: number | null = null;
+    for (let i = 0; i < Lines.length; i++) {
+      const line = Lines[i];
+      if (
+        typeof line.StartTime === "number" &&
+        typeof line.EndTime === "number" &&
+        line.StartTime <= ProcessedPosition &&
+        line.EndTime >= ProcessedPosition
+      ) {
+        if (line.DotLine) musicalIndex = i;
+        else if (!IsBGLine(line)) leadIndex = i;
+      }
+    }
+    const lvIndex = leadIndex ?? musicalIndex;
+    if (lvIndex === null) return null;
+    return { ...Lines[lvIndex], _LineIndex: lvIndex } as EnhancedLyricsItem;
+  }
   const index = PickScrollLineIndex(Lines, ProcessedPosition);
   if (index === null) return null;
   return { ...Lines[index], _LineIndex: index } as EnhancedLyricsItem;
@@ -484,15 +507,13 @@ const ScrollTo = (
   glide: boolean = false
 ) => {
   if (lineIndex !== undefined && getLyricsVirtualizer()) {
-    // instantScroll is effectively always true in the virtualizer path
-    // (we set scrollTop directly), but passing the flag keeps the intent
-    // explicit and allows a future smooth-scroll path if needed.
+    const lyricVideo = isLyricVideoRenderer();
     scrollLyricsToIndex(
       lineIndex,
-      type === "Top" ? "start" : "center",
-      instantScroll,
-      type === "Top" ? -GetTopScrollOffset(container) : GetCenterScrollOffset(container),
-      glide
+      lyricVideo ? "center" : type === "Top" ? "start" : "center",
+      instantScroll || lyricVideo,
+      lyricVideo ? 0 : type === "Top" ? -GetTopScrollOffset(container) : GetCenterScrollOffset(container),
+      lyricVideo ? false : glide
     );
     return;
   }
@@ -918,7 +939,7 @@ export function ScrollToActiveLine(ScrollSimplebar: any) {
       // Only auto-scroll if BOTH conditions are met:
       // 1. User hasn't scrolled in the last second (cooldown passed)
       // 2. AND the active line is in viewport
-      if (timeSinceLastScroll > USER_SCROLL_COOLDOWN && isLineInViewport) {
+      if (isLyricVideoRenderer() || (timeSinceLastScroll > USER_SCROLL_COOLDOWN && isLineInViewport)) {
         // --- REVISED LOGIC for resuming auto-scroll ---
         //const wasUserScrolling = isUserScrolling; // Capture state before changing
         isUserScrolling = false;
@@ -939,6 +960,7 @@ export function ScrollToActiveLine(ScrollSimplebar: any) {
         //}
         // Scroll if the line is different from the last auto-scrolled line
         if (!isSameLine) {
+          if (isLyricVideoRenderer() && IsBGLine(currentLine)) return;
           if (!canAutoScrollToIndex(Lines, currentLine._LineIndex, isPlaybackBacktrack)) return;
           const Scroll = () => {
             if (!canAutoScrollToIndex(Lines, currentLine._LineIndex, isPlaybackBacktrack)) return;
@@ -952,6 +974,7 @@ export function ScrollToActiveLine(ScrollSimplebar: any) {
           // it collapses, so scrolling at the same moment makes the two read as
           // one motion instead of two.
           if (
+            !isLyricVideoRenderer() &&
             !$smoothScrolling.get() &&
             !lyricsUseRefreshedLayout() &&
             Lines[currentLine._LineIndex - 1] &&

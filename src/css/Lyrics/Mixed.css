@@ -710,6 +710,15 @@
   align-items: center;
 }
 
+/* "and" before the last of several makers, spaced on both sides; a "," sits against the name
+   before it. */
+#SpicyLyricsPage.SpicyRenderer .LyricsContainer :is(.LyricsContent, .LyricsPinnedFooter) .SongInfo .SongInfoSeparator {
+  margin-inline: 0.4em;
+}
+#SpicyLyricsPage.SpicyRenderer .LyricsContainer :is(.LyricsContent, .LyricsPinnedFooter) .SongInfo .SongInfoSeparator.Comma {
+  margin-inline: 0 0.4em;
+}
+
 /* Avatars follow the adjacent name's font size. */
 #SpicyLyricsPage.SpicyRenderer .LyricsContainer :is(.LyricsContent, .LyricsPinnedFooter) .SongInfo .Uploader img,
 #SpicyLyricsPage.SpicyRenderer .LyricsContainer :is(.LyricsContent, .LyricsPinnedFooter) .SongInfo .Maker img {
@@ -1501,4 +1510,100 @@
     scale 0.4s ease-in-out,
     opacity 0.4s linear,
     --SLR_SungAlpha 0.3s cubic-bezier(0.33, 0, 0.2, 1) !important;
+}
+
+/* Center Lyrics (setting): every line, duet or not, sits in the middle of the
+   column and scales from its centre. The id is doubled so these outrank the
+   per-side alignment, padding and transform-origin rules for each renderer and
+   view without restating them, including the ones marked !important. */
+#SpicyLyricsPage#SpicyLyricsPage.SpicyRenderer.CenterLyrics .LyricsContainer .LyricsContent .line {
+  justify-content: center !important;
+  text-align: center !important;
+  padding-left: 3cqw !important;
+  padding-right: 3cqw !important;
+  transform-origin: center center !important;
+}
+
+#SpicyLyricsPage#SpicyLyricsPage.SpicyRenderer.CenterLyrics.BloomRenderer .LyricsContainer .LyricsContent .line:not(.musical-line, .static) {
+  transform-origin: center bottom !important;
+}
+
+#SpicyLyricsPage#SpicyLyricsPage.SpicyRenderer.CenterLyrics .LyricsContainer .LyricsContent .line.bg-line:not(.musical-line, .static) {
+  transform-origin: center top !important;
+}
+
+#SpicyLyricsPage#SpicyLyricsPage.SpicyRenderer.CenterLyrics .word-group {
+  justify-content: center;
+}
+
+#SpicyLyricsPage#SpicyLyricsPage.SpicyRenderer.CenterLyrics .LyricsContainer .LyricsContent .line .RomanizedRow {
+  text-align: center;
+  transform-origin: center top;
+}
+
+#SpicyLyricsPage#SpicyLyricsPage.SpicyRenderer.CenterLyrics .LyricsContainer :is(.LyricsContent, .LyricsPinnedFooter) :is(.Credits, .LyricsProvider, .SongInfo, .SongCredits, .PinnedFooterDetail, .CommunityCredits) {
+  text-align: center !important;
+  align-items: center;
+}
+
+/* Refined Credits caps the credits block's width; centered, the block itself sits in
+   the middle too instead of against the left edge. The pinned copy's box is matched
+   to the lines' box by LyricsVirtualizer (_updatePinnedFooterLayout). */
+#SpicyLyricsPage#SpicyLyricsPage.SpicyRenderer.CenterLyrics .LyricsContainer :is(.LyricsContent, .LyricsPinnedFooter) .SongCredits {
+  margin-inline: auto !important;
+}
+
+#SpicyLyricsPage#SpicyLyricsPage.SpicyRenderer.CenterLyrics .LyricsContainer :is(.LyricsContent, .LyricsPinnedFooter) .SongInfo :is(.Uploader, .Maker) {
+  justify-content: center;
+}
+
+/* Lyric Video Mode: one centered lyric line at a time (at most 2 visual lines) over Kawarp. */
+#SpicyLyricsPage#SpicyLyricsPage.SpicyRenderer.LyricVideoRenderer .LyricsContainer .LyricsContent {
+  --DefaultLyricsSize: calc(clamp(2.4rem, 6.2cqw, 5.5rem) * var(--SL-LyricsScale, 1));
+  scrollbar-width: none;
+}
+
+#SpicyLyricsPage#SpicyLyricsPage.SpicyRenderer.LyricVideoRenderer .LyricsContainer .LyricsContent .simplebar-content-wrapper {
+  -webkit-mask-image: none !important;
+  mask-image: none !important;
+}
+
+#SpicyLyricsPage#SpicyLyricsPage.SpicyRenderer.LyricVideoRenderer .LyricsContainer .LyricsContent .simplebar-track,
+#SpicyLyricsPage#SpicyLyricsPage.SpicyRenderer.LyricVideoRenderer .LyricsContainer .LyricsPinnedFooter {
+  display: none !important;
+}
+
+#SpicyLyricsPage#SpicyLyricsPage.SpicyRenderer.LyricVideoRenderer .LyricsContainer .LyricsContent .line {
+  --font-size: calc(var(--DefaultLyricsSize) * var(--lv-fit, 1));
+  width: 100%;
+  justify-content: center !important;
+  text-align: center !important;
+  text-wrap: balance;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  transform-origin: center center !important;
+  transition: opacity 0.16s ease !important;
+}
+
+#SpicyLyricsPage#SpicyLyricsPage.SpicyRenderer.LyricVideoRenderer .word-group {
+  justify-content: center;
+}
+
+#SpicyLyricsPage#SpicyLyricsPage.SpicyRenderer.LyricVideoRenderer .LyricsContainer .LyricsContent .line .RomanizedRow {
+  text-align: center;
+  transform-origin: center top;
+}
+
+#SpicyLyricsPage#SpicyLyricsPage.SpicyRenderer.LyricVideoRenderer .LyricsContainer .LyricsContent .line:not(.LyricVideoCurrent, .static) {
+  opacity: 0 !important;
+  pointer-events: none;
+}
+
+#SpicyLyricsPage#SpicyLyricsPage.SpicyRenderer.LyricVideoRenderer .LyricsContainer .LyricsContent .line.LyricVideoCurrent {
+  opacity: 1 !important;
+  pointer-events: auto;
+}
+
+#SpicyLyricsPage#SpicyLyricsPage.SpicyRenderer.LyricVideoRenderer .LyricsContainer .LyricsContent .line.bg-line {
+  display: none !important;
 }

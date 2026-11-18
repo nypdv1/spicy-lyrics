@@ -167,6 +167,11 @@
   margin-inline: 0.45em;
 }
 
+/* A second or later maker follows its own "," or "and" instead of the dot. */
+#SpicyLyricsPage.SpicyRenderer.Exp_RefinedCredits .LyricsContainer :is(.SongCredits, .LyricsPinnedFooter) .CommunityCredits .Maker.MakerContinued::before {
+  content: none;
+}
+
 #SpicyLyricsPage.SpicyRenderer.Exp_RefinedCredits .LyricsContainer :is(.LyricsContent, .LyricsPinnedFooter) .SongInfo .song-info-profile-section {
   display: inline-flex;
   align-items: center;

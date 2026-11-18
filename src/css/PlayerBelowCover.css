@@ -236,6 +236,38 @@
   opacity: 0.62;
 }
 
+/* The row around the artists and the release year (ContentBox.css) is centred and 85cqw wide
+   elsewhere. Here it starts on the cover's edge under the title and ends where the title's box
+   does, and the artists inside it take what the year leaves. */
+/* The end fade is the row's, not the artists': sized to their text, the artists would otherwise
+   fade their own last letters with the year right after them. The row fades only what reaches
+   its end. */
+#SpicyLyricsPage.Fullscreen.Exp_PlayerBelowCover:not(.CompactMode, .ForcedCompactMode, .CanvasImmersive) .ContentBox .NowBar .Header > .Metadata .ArtistsRow {
+  justify-content: flex-start;
+  width: calc(100% - var(--PB_HeartW) - 4.5cqw);
+  max-width: calc(100% - var(--PB_HeartW) - 4.5cqw);
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 3.75cqw), transparent 100%);
+  mask-image: linear-gradient(90deg, #000 calc(100% - 3.75cqw), transparent 100%);
+}
+
+#SpicyLyricsPage.Fullscreen.Exp_PlayerBelowCover:not(.CompactMode, .ForcedCompactMode, .CanvasImmersive) .ContentBox .NowBar .Header > .Metadata .ArtistsRow .Artists {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 var(--PB_StartFade), #000 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 var(--PB_StartFade), #000 100%);
+}
+
+#SpicyLyricsPage.Fullscreen.Exp_PlayerBelowCover:not(.CompactMode, .ForcedCompactMode, .CanvasImmersive) .ContentBox .NowBar .Header > .Metadata .ArtistsRow .ArtistYear {
+  font-size: var(--PB_ArtistSize) !important;
+  line-height: 1.3 !important;
+}
+
+/* The year before the artists would push them off the edge; its start padding goes. */
+#SpicyLyricsPage.Fullscreen.Exp_PlayerBelowCover:not(.CompactMode, .ForcedCompactMode, .CanvasImmersive) .ContentBox .NowBar .Header > .Metadata .ArtistsRow .ArtistYear.before {
+  padding-left: 0;
+}
+
 #SpicyLyricsPage.Fullscreen.Exp_PlayerBelowCover:not(.CompactMode, .ForcedCompactMode, .CanvasImmersive) .ContentBox .NowBar .CenteredView .Header .MediaBox .MediaContent .Heart {
   top: calc(var(--PB_MetaTop) + (var(--PB_MetaH) - var(--PB_HeartW)) / 2);
   left: auto;

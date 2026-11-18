@@ -9,6 +9,7 @@ import {
   $simpleLyricsModeRenderingType,
   $spaceGravityMode,
   isBloomRenderer,
+  isLyricVideoRenderer,
 } from "../../../../utils/stores.ts";
 import {
   EarlySungBefore,
@@ -686,7 +687,11 @@ function getPacedShare(word: SyllableLead, span: SweepSpan, position: number): n
     if (position < letter.StartTime) break;
     const length = letter.EndTime - letter.StartTime;
     const filled = length > 0 ? Math.min(1, (position - letter.StartTime) / length) : 1;
-    x = lx[j] + lw[j] * filled;
+    // Letter boxes overlap (italic overhang padding, cancelled by negative
+    // margins), so a letter fills only up to where the next one begins.
+    // Filling to its own box end would pull the light back at every letter.
+    const letterEnd = j + 1 < letters.length ? lx[j + 1] : width;
+    x = lx[j] + (letterEnd - lx[j]) * filled;
     if (filled < 1) break;
   }
   return Math.min(1, x / width);
@@ -845,6 +850,10 @@ function setStyleIfChanged(
   epsilon = 0,
   compareValue?: number
 ): void {
+  // A stub spring (Simple Lyrics has no scale or glow springs) steps to undefined, and the maths
+  // on it to NaN. Written, NaN discards every property built on the variable (a text-shadow, a
+  // transform), so the element keeps the stylesheet's value instead.
+  if (value.includes("NaN") || value.includes("undefined")) return;
   let map = _styleCache.get(el);
   if (!map) {
     map = new Map();
@@ -944,14 +953,25 @@ function markBackgroundGroups(
   if (!enabled && !bgGroupsMarked) return;
   bgGroupsMarked = enabled;
   let leadState: "NotSung" | "Active" | "Sung" = "NotSung";
+  let leadStart = 0;
+  let stacked = false;
   let moving: boolean | null = null;
-  for (const line of lines) {
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index];
     const state = getElementState(position, line.StartTime, line.EndTime);
     if (!line.BGLine) {
       leadState = state;
+      leadStart = line.StartTime;
+      stacked = lines[index + 1]?.BGLine === true && lines[index + 2]?.BGLine === true;
       continue;
     }
-    let open = enabled && (leadState === "Active" || state === "Active");
+    // A background vocal sung in full before its lead starts has already been
+    // shown; its lead coming in shouldn't open it a second time. With several
+    // stacked under one lead, each opens only while it is sung itself, so they
+    // don't pile up under the lead all at once.
+    const sungBeforeLead = line.EndTime <= leadStart;
+    const leadOpens = leadState === "Active" && !sungBeforeLead && !stacked;
+    let open = enabled && (leadOpens || state === "Active");
     if (
       enabled &&
       !open &&
@@ -1380,6 +1400,28 @@ type WordTiming = {
 // A vocal stutter has one visible word, but several independent playback
 // windows. Outside one of those windows it is either waiting or already sung;
 // it must never interpolate across the outer first-to-last source span.
+type ReplayRange = NonNullable<SyllableLead["RestartRanges"]>[number];
+
+// The replay a word is on. The repeat in progress is the latest cue reached: a
+// repeated phrase restarts as a whole, so once a repeat's first word starts
+// (its CueTime) every word of the phrase belongs to it, even one whose previous
+// part the source still has overlapping. Within that repeat it's the latest of
+// the word's replays to have started (`I-I` replays `I` twice per repeat).
+// Null while the word waits for its first replay in the repeat.
+function getCurrentReplay(ranges: ReplayRange[], position: number): ReplayRange | null {
+  let cue = -Infinity;
+  for (const range of ranges) {
+    const at = range.CueTime ?? range.StartTime;
+    if (at <= position && at > cue) cue = at;
+  }
+  let current: ReplayRange | null = null;
+  for (const range of ranges) {
+    if ((range.CueTime ?? range.StartTime) !== cue || range.StartTime > position) continue;
+    if (!current || range.StartTime >= current.StartTime) current = range;
+  }
+  return current;
+}
+
 function getWordTiming(word: SyllableLead, position: number): WordTiming {
   const ranges = word.RestartRanges;
   if (!ranges?.length) {
@@ -1391,17 +1433,17 @@ function getWordTiming(word: SyllableLead, position: number): WordTiming {
       Restart: false,
     };
   }
-  const active = ranges.find((range) => position >= range.StartTime && position <= range.EndTime);
-  if (active) {
+  const current = getCurrentReplay(ranges, position);
+  if (current && position <= current.EndTime) {
     return {
-      StartTime: active.StartTime,
-      EndTime: active.EndTime,
-      State: getElementState(position, active.StartTime, active.EndTime),
-      Progress: getProgressPercentage(position, active.StartTime, active.EndTime),
+      StartTime: current.StartTime,
+      EndTime: current.EndTime,
+      State: getElementState(position, current.StartTime, current.EndTime),
+      Progress: getProgressPercentage(position, current.StartTime, current.EndTime),
       Restart: true,
     };
   }
-  const waiting = position < ranges[0].StartTime;
+  const waiting = !current;
   return {
     StartTime: word.StartTime,
     EndTime: word.EndTime,
@@ -1409,6 +1451,49 @@ function getWordTiming(word: SyllableLead, position: number): WordTiming {
     Progress: waiting ? 0 : 1,
     Restart: false,
   };
+}
+
+// The lift last drawn on each replaying word (Bloom), to tell a rise along the
+// float curve from a drop back to rest at a new repeat.
+const _replayLift = new WeakMap<SyllableLead, number>();
+
+// Bloom's line sweep reads each word's StartTime and EndTime. A replaying word
+// spans every repeat, so give the sweep the repeat in progress instead (or the
+// first, before any): the light then leaves it and comes back through it on
+// each replay, with the same soft edge as every other word on the line.
+// Per word list, built once: the list itself when nothing replays, else one
+// with a stand-in for each replaying word that inherits the word and owns only
+// its times. Each frame then just retimes the stand-ins, allocating nothing.
+const _sweepTimedWords = new WeakMap<SyllableLead[], { Words: SyllableLead[]; Replays: number[] }>();
+
+function getSweepTimedWords(words: SyllableLead[], position: number): SyllableLead[] {
+  let timed = _sweepTimedWords.get(words);
+  if (!timed) {
+    const replays: number[] = [];
+    words.forEach((word, index) => { if (word.RestartRanges?.length) replays.push(index); });
+    timed = {
+      Words: replays.length
+        ? words.map((word) => (word.RestartRanges?.length ? Object.create(word) as SyllableLead : word))
+        : words,
+      Replays: replays,
+    };
+    _sweepTimedWords.set(words, timed);
+  }
+  for (const index of timed.Replays) {
+    const ranges = words[index].RestartRanges!;
+    let range = getCurrentReplay(ranges, position);
+    if (!range) {
+      // Waiting: its next replay, still to come, so the light holds before it.
+      for (const candidate of ranges) {
+        if (candidate.StartTime > position && (!range || candidate.StartTime < range.StartTime)) range = candidate;
+      }
+      range ??= ranges[0];
+    }
+    const standIn = timed.Words[index];
+    standIn.StartTime = range.StartTime;
+    standIn.EndTime = range.EndTime;
+  }
+  return timed.Words;
 }
 
 function reconcileLineAnimation(line: LyricsSyllable | LyricsLine, position: number): void {
@@ -1500,6 +1585,87 @@ function reconcileLineAnimation(line: LyricsSyllable | LyricsLine, position: num
       letter.HTMLElement.style.animation = "none";
       if (simple) letter.HTMLElement.style.setProperty("--SLM_GradientPosition", letterState === "Sung" ? "100%" : "-50%");
       else setStyleIfChanged(letter.HTMLElement, "--gradient-position", `${letterState === "Sung" ? 100 : letterState === "Active" ? -20 + 120 * letterProgress : -20}%`);
+    }
+  }
+}
+
+let currentLyricVideoLine: HTMLElement | null = null;
+
+function fitLyricVideoLine(line: HTMLElement): void {
+  if (line.classList.contains("musical-line")) {
+    line.style.removeProperty("--lv-fit");
+    return;
+  }
+  const win = line.ownerDocument.defaultView;
+  if (!win) return;
+  line.style.removeProperty("--lv-fit");
+  const cs = win.getComputedStyle(line);
+  const fontSize = parseFloat(cs.fontSize) || 32;
+  const lineHeight = parseFloat(cs.lineHeight) || fontSize * 1.25;
+  const maxHeight = lineHeight * 2.35;
+  if (line.scrollHeight <= maxHeight) return;
+
+  let fit = Math.max(0.55, Math.min(0.92, Math.sqrt((lineHeight * 2.15) / line.scrollHeight)));
+  line.style.setProperty("--lv-fit", fit.toFixed(3));
+  if (line.scrollHeight > maxHeight && fit > 0.55) {
+    fit = Math.max(0.55, fit * 0.85);
+    line.style.setProperty("--lv-fit", fit.toFixed(3));
+  }
+}
+
+const LYRIC_VIDEO_FADE_LEAD_MS = 220;
+
+function syncLyricVideoCurrentLine(
+  lines: { HTMLElement: HTMLElement; StartTime: number; EndTime: number }[] | null,
+  position: number
+): void {
+  if (!isLyricVideoRenderer() || !lines) {
+    if (currentLyricVideoLine) {
+      currentLyricVideoLine.classList.remove("LyricVideoCurrent");
+      currentLyricVideoLine.style.removeProperty("--lv-fit");
+      currentLyricVideoLine = null;
+    }
+    return;
+  }
+
+  let next: HTMLElement | null = null;
+  let fallbackMusical: HTMLElement | null = null;
+  for (let i = 0; i < lines.length; i++) {
+    const item = lines[i];
+    const el = item.HTMLElement;
+    if (!el.isConnected || !el.classList.contains("Active")) continue;
+    // Fade the current line out slightly before it ends so it finishes fading
+    // in place before the scroller snaps to the next line.
+    const fadingOut =
+      item.EndTime - item.StartTime > LYRIC_VIDEO_FADE_LEAD_MS * 2 &&
+      position >= item.EndTime - LYRIC_VIDEO_FADE_LEAD_MS;
+    if (fadingOut) continue;
+    if (el.classList.contains("musical-line")) {
+      fallbackMusical = el;
+    } else if (!el.classList.contains("bg-line")) {
+      next = el;
+    }
+  }
+  next ??= fallbackMusical;
+
+  if (next !== currentLyricVideoLine) {
+    const prev = currentLyricVideoLine;
+    if (prev) {
+      if (next) {
+        // Overlapping line or seek: hide immediately so it doesn't jump with the scroller.
+        prev.style.setProperty("transition", "none", "important");
+        prev.classList.remove("LyricVideoCurrent");
+        const win = prev.ownerDocument.defaultView ?? window;
+        win.requestAnimationFrame(() => prev.style.removeProperty("transition"));
+      } else {
+        prev.classList.remove("LyricVideoCurrent");
+      }
+    }
+    currentLyricVideoLine = next;
+    if (next) {
+      next.style.removeProperty("transition");
+      next.classList.add("LyricVideoCurrent");
+      fitLyricVideoLine(next);
     }
   }
 }
@@ -1728,7 +1894,7 @@ export function Animate(position: number): void {
 
         const words = line.Syllables.Lead;
         const sweep = refreshedSimple ? getLineSweep(line.HTMLElement, words) : null;
-        if (sweep) updateLineSweep(sweep, words, ProcessedPosition);
+        if (sweep) updateLineSweep(sweep, getSweepTimedWords(words, ProcessedPosition), ProcessedPosition);
         // Refreshed: no word floats higher than the one before it, so a word
         // timed out of order never stands up ahead of the line.
         let floatCap = 1;
@@ -1768,19 +1934,24 @@ export function Animate(position: number): void {
             // Spring values otherwise carry over from the preceding vocal
             // fragment. Reset at each stutter cue before feeding its new
             // progress, making the same visible word genuinely replay.
+            const replays = !!word.RestartRanges?.length;
             if (timing.Restart && word.RestartRangeStart !== timingStart) {
               word.RestartRangeStart = timingStart;
-              word.AnimatorStore.Scale.SetGoal(ScaleSpline.at(0), true);
-              word.AnimatorStore.YOffset.SetGoal(YOffsetSpline.at(0), true);
-              word.AnimatorStore.Glow.SetGoal(GlowSpline.at(0), true);
-              word.HTMLElement.style.setProperty("--gradient-position", "-20%");
               // Simple Lyrics uses a CSS animation instead of the spring for
               // its wipe. Its one-shot flags must reset too, otherwise only
               // the first syllable in a stutter ever plays the animation.
               word.SLMAnimated = false;
               word.PreSLMAnimated = false;
-              word.HTMLElement.style.animation = "none";
-              word.HTMLElement.style.setProperty("--SLM_GradientPosition", "-50%");
+              // Bloom lets the springs carry scale, lift and glow back down
+              // instead; its fill restarts from unlit as a fresh wipe.
+              if (!refreshedSimple) {
+                word.AnimatorStore.Scale.SetGoal(ScaleSpline.at(0), true);
+                word.AnimatorStore.YOffset.SetGoal(YOffsetSpline.at(0), true);
+                word.AnimatorStore.Glow.SetGoal(GlowSpline.at(0), true);
+                word.HTMLElement.style.setProperty("--gradient-position", "-20%");
+                word.HTMLElement.style.animation = "none";
+                word.HTMLElement.style.setProperty("--SLM_GradientPosition", "-50%");
+              }
             }
 
             if (wordState === "Active") {
@@ -1827,13 +1998,17 @@ export function Animate(position: number): void {
               if (isLetterGroup) {
                 targetYOffset = 0;
               } else {
-                floatCap = Math.min(floatCap, getRefreshedFloat(timingStart, ProcessedPosition));
+                // A replaying word waiting for its next cue rests level, like
+                // any word not yet sung, rather than holding its earlier lift.
+                const float = replays && wordState === "NotSung"
+                  ? 0
+                  : getRefreshedFloat(timingStart, ProcessedPosition);
+                floatCap = Math.min(floatCap, float);
                 targetYOffset = refreshedLiftOffset(floatCap);
               }
-              // Bloom's line sweep is based on the outer word span. A stutter
-              // reuses one word over several short spans, so its own cue
-              // progress must win instead of being overwritten by that sweep.
-              if (sweepSpan && !word.RestartRanges?.length) {
+              // A replaying word is in the sweep too, timed by its current
+              // repeat (getSweepTimedWords), so it fills like its neighbours.
+              if (sweepSpan) {
                 targetGradientPos = getSweepGradientPosition(
                   sweep!.Edges[wordIndex],
                   sweepSpan.X,
@@ -1845,11 +2020,16 @@ export function Animate(position: number): void {
 
             word.AnimatorStore.Scale.SetGoal(targetScale);
             // Refreshed: the float already eases, so the spring is pinned to it.
-            word.AnimatorStore.YOffset.SetGoal(targetYOffset, refreshedSimple);
+            // A replaying word follows the same float, except when a repeat
+            // takes it back down to rest: the spring eases that drop instead.
+            const shownLift = replays ? _replayLift.get(word) : undefined;
+            const liftDrops = shownLift !== undefined && targetYOffset > shownLift + 0.0001;
+            word.AnimatorStore.YOffset.SetGoal(targetYOffset, refreshedSimple && !liftDrops);
             word.AnimatorStore.Glow.SetGoal(targetGlow);
 
             const currentScale = word.AnimatorStore.Scale.Step(deltaTime);
             const currentYOffset = word.AnimatorStore.YOffset.Step(deltaTime);
+            if (replays) _replayLift.set(word, currentYOffset);
             const currentGlow = word.AnimatorStore.Glow.Step(deltaTime);
 
             setStyleIfChanged(word.HTMLElement, "scale", `${currentScale}`, 0.001);
@@ -1937,19 +2117,24 @@ export function Animate(position: number): void {
               } else {
                 setStyleIfChanged(word.HTMLElement, "--gradient-position", `${targetGradientPos}%`);
               }
-              // Reduce redundant writes using thresholds for smoother performance
-              setStyleIfChanged(
-                word.HTMLElement,
-                "--text-shadow-blur-radius",
-                `${4 + (hasLongWordEffect ? 8 : 2) * currentGlow}px`,
-                0.5
-              );
-              setStyleIfChanged(
-                word.HTMLElement,
-                "--text-shadow-opacity",
-                `${Math.min(currentGlow * (hasLongWordEffect ? 80 : 35), 100)}%`,
-                1
-              );
+              // Simple Lyrics' word springs are stubs with no glow (createWordSprings); the
+              // stylesheet's glow stands. Writing their undefined step here set NaN, which
+              // threw out every text-shadow built on these.
+              if (typeof currentGlow === "number") {
+                // Reduce redundant writes using thresholds for smoother performance
+                setStyleIfChanged(
+                  word.HTMLElement,
+                  "--text-shadow-blur-radius",
+                  `${4 + (hasLongWordEffect ? 8 : 2) * currentGlow}px`,
+                  0.5
+                );
+                setStyleIfChanged(
+                  word.HTMLElement,
+                  "--text-shadow-opacity",
+                  `${Math.min(currentGlow * (hasLongWordEffect ? 80 : 35), 100)}%`,
+                  1
+                );
+              }
             }
           } else if (isDot && !isLetterGroup && refreshedSimple) {
             animateRefreshedDot(line, word, wordIndex, ProcessedPosition);
@@ -2047,20 +2232,23 @@ export function Animate(position: number): void {
               0.0001,
               currentYOffset ?? 0
             ); // Use --DefaultLyricsSize
-            setStyleIfChanged(word.HTMLElement, "scale", `${currentScale}`, 0.001);
+            // Simple Lyrics' dot springs are stubs except for opacity (createDotSprings).
+            if (typeof currentScale === "number") setStyleIfChanged(word.HTMLElement, "scale", `${currentScale}`, 0.001);
             setStyleIfChanged(word.HTMLElement, "opacity", `${currentOpacity}`, 0.001);
-            setStyleIfChanged(
-              word.HTMLElement,
-              "--text-shadow-blur-radius",
-              `${4 + 6 * currentGlow}px`,
-              0.5
-            ); // Match inspiration
-            setStyleIfChanged(
-              word.HTMLElement,
-              "--text-shadow-opacity",
-              `${currentGlow * 90}%`,
-              1
-            ); // Match inspiration
+            if (typeof currentGlow === "number") {
+              setStyleIfChanged(
+                word.HTMLElement,
+                "--text-shadow-blur-radius",
+                `${4 + 6 * currentGlow}px`,
+                0.5
+              ); // Match inspiration
+              setStyleIfChanged(
+                word.HTMLElement,
+                "--text-shadow-opacity",
+                `${currentGlow * 90}%`,
+                1
+              ); // Match inspiration
+            }
           }
 
           if (isLetterGroup && word.Letters) {
@@ -3054,6 +3242,9 @@ export function Animate(position: number): void {
       ProcessedPosition,
       !$spaceGravityMode.get() && isExperimentEnabled("keepOverlappingLines") ? firstActive : -1
     );
+    syncLyricVideoCurrentLine(LyricsObject.Types[CurrentLyricsType].Lines, ProcessedPosition);
+  } else {
+    syncLyricVideoCurrentLine(null, ProcessedPosition);
   }
   // Stands in for `.LyricsContent:not(:has(.line.Active)):not(:has(.line.NotSung))`
   // in Mixed.css: with line classes inside a :has(), every line change made

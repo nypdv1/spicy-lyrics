@@ -7,6 +7,9 @@ import { fetchSpotifyLyrics } from "./Sources/Spotify.ts";
 import { fetchLRCLIBLyrics } from "./Sources/Lrclib.ts";
 import { fetchNeteaseLyrics } from "./Sources/Netease.ts";
 import { fetchLrcRedLyrics } from "./Sources/LrcRed.ts";
+import { fetchUnisonLyrics } from "./Sources/Unison.ts";
+import { LocalFileQueries } from "./Sources/LocalFileQuery.ts";
+import type { TrackLyricsInfo } from "./Sources/Types.ts";
 
 export { refreshMusixmatchToken } from "./Sources/Musixmatch.ts";
 
@@ -74,6 +77,16 @@ function getLyricsTypeScore(lyrics: any): number {
 }
 
 const FALLBACK_PROVIDER_TIMEOUT_MS = 4000;
+// getLyricsTypeScore for line- and word-timed lyrics.
+const LINE_SCORE = 2;
+const WORD_SCORE = 3;
+
+/**
+ * The sources that can look up a local file. A local file has no Spotify track id or ISRC, so
+ * only those that search by title, artist and length can find it (lrc.red through its search,
+ * Unison by title, artist and duration).
+ */
+export const LOCAL_FILE_SOURCES: ReadonlySet<LyricsSourceProviderId> = new Set(["musixmatch", "unison", "lrcred", "lrclib", "netease"]);
 
 type FetchLyricsFromProvidersOptions = {
   onFirstLyrics?: (lyrics: any) => void;
@@ -99,23 +112,42 @@ export async function fetchLyricsFromProviders(
     return null;
   }
 
+  const isLocalFile = uri.startsWith("spotify:local:");
   let spicyRawPromise: Promise<ExternalLyricsResult | null> | null = null;
   const getSpicyRaw = () => {
-    spicyRawPromise ??= fetchSpicyLyricsRaw(trackInfo.id);
+    // A local file's "id" is part of its path, not a track Spicy Lyrics knows.
+    spicyRawPromise ??= isLocalFile ? Promise.resolve(null) : fetchSpicyLyricsRaw(trackInfo.id);
     return spicyRawPromise;
   };
 
-  function startProviderRequest(provider: LyricsSourceProviderId): Promise<ExternalLyricsResult | null> {
+  function requestFrom(provider: LyricsSourceProviderId, info: TrackLyricsInfo): Promise<ExternalLyricsResult | null> {
     switch (provider) {
       case "spicy": return fetchSpicyLyrics(getSpicyRaw());
-      case "musixmatch": return fetchMusixmatchLyrics(trackInfo, getSpicyRaw);
+      case "musixmatch": return fetchMusixmatchLyrics(info, getSpicyRaw);
       case "apple": return fetchAppleMusicLyrics(getSpicyRaw());
-      case "spotify": return fetchSpotifyLyrics(trackInfo);
-      case "lrcred": return withProviderTimeout(fetchLrcRedLyrics(trackInfo), FALLBACK_PROVIDER_TIMEOUT_MS * 2);
-      case "lrclib": return withProviderTimeout(fetchLRCLIBLyrics(trackInfo), FALLBACK_PROVIDER_TIMEOUT_MS);
-      case "netease": return withProviderTimeout(fetchNeteaseLyrics(trackInfo), FALLBACK_PROVIDER_TIMEOUT_MS);
+      case "spotify": return fetchSpotifyLyrics(info);
+      case "unison": return withProviderTimeout(fetchUnisonLyrics(info), FALLBACK_PROVIDER_TIMEOUT_MS * 2);
+      case "lrcred": return withProviderTimeout(fetchLrcRedLyrics(info), FALLBACK_PROVIDER_TIMEOUT_MS * 2);
+      case "lrclib": return withProviderTimeout(fetchLRCLIBLyrics(info), FALLBACK_PROVIDER_TIMEOUT_MS);
+      case "netease": return withProviderTimeout(fetchNeteaseLyrics(info), FALLBACK_PROVIDER_TIMEOUT_MS);
       default: return Promise.resolve(null);
     }
+  }
+
+  // A local file's tags are loose, so each source tries the lookups LocalFileQueries guesses
+  // from them, one after another, until one finds the song.
+  const localQueries = isLocalFile ? LocalFileQueries(trackInfo) : [];
+  async function requestLocalFile(provider: LyricsSourceProviderId): Promise<ExternalLyricsResult | null> {
+    for (const query of localQueries) {
+      const result = await requestFrom(provider, query).catch(() => null);
+      if (result?.lyrics) return result;
+    }
+    return null;
+  }
+
+  function startProviderRequest(provider: LyricsSourceProviderId): Promise<ExternalLyricsResult | null> {
+    if (isLocalFile) return LOCAL_FILE_SOURCES.has(provider) ? requestLocalFile(provider) : Promise.resolve(null);
+    return requestFrom(provider, trackInfo);
   }
 
   // Start every enabled provider now. Results are still consumed in configured
@@ -144,9 +176,13 @@ export async function fetchLyricsFromProviders(
   let hadPreferredResult = false;
 
   for (const provider of order) {
-    // If a preferred source (spicy/musixmatch) already gave us something,
-    // lrclib and netease are unlikely to improve on it — skip them.
-    if (hadPreferredResult && (provider === "lrclib" || provider === "netease")) {
+    // Once a preferred source (spicy/musixmatch/apple) has lyrics as well timed as a fallback
+    // can offer, skip that fallback: netease times by line at best, lrclib by word (Lyricsfile).
+    // Plain text from a preferred source doesn't count: a timed copy beats it.
+    if (hadPreferredResult && provider === "netease" && bestScore >= LINE_SCORE) {
+      continue;
+    }
+    if (hadPreferredResult && provider === "lrclib" && bestScore >= WORD_SCORE) {
       continue;
     }
 

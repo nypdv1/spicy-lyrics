@@ -1,7 +1,49 @@
-import { createProviderResult, buildLineLyrics, buildStaticLyrics, parseTimestampToMilliseconds } from "./Shared.ts";
+import { createProviderResult, buildLineLyrics, buildStaticLyrics, buildSyllableLyrics, parseTimestampToMilliseconds } from "./Shared.ts";
+import { ParseLyricsfile } from "./Lyricsfile.ts";
 import type { TrackLyricsInfo, ExternalLyricsResult, TimedLine } from "./Types.ts";
+import { PickSearchHit } from "./SearchMatch.ts";
 
-function parseLRCLikeLyrics(text: string): {
+const LRCLIB_HEADERS = () => ({
+  "x-user-agent": `spicetify v${Spicetify.Config.version} (https://github.com/spicetify/cli)`,
+});
+
+type LrclibRecord = {
+  trackName?: string;
+  artistName?: string;
+  duration?: number;
+  instrumental?: boolean;
+  syncedLyrics?: string | null;
+  plainLyrics?: string | null;
+  // Word-timed lyrics as a Lyricsfile (YAML), when hasWordSync is set.
+  hasWordSync?: boolean;
+  lyricsfile?: string | null;
+};
+
+/**
+ * The exact lookup wants the album too, and misses a track whose tags name another one (a local
+ * file most of all). Searching by title and artist finds it; the hit must still be this song.
+ */
+async function searchLRCLIB(trackInfo: TrackLyricsInfo): Promise<LrclibRecord | null> {
+  const url = `https://lrclib.net/api/search?${[
+    ["track_name", trackInfo.title],
+    ["artist_name", trackInfo.artist],
+  ]
+    .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+    .join("&")}`;
+  const response = await fetch(url, { headers: LRCLIB_HEADERS() });
+  if (!response.ok) return null;
+  const hits = (await response.json()) as LrclibRecord[];
+  if (!Array.isArray(hits)) return null;
+  return PickSearchHit(
+    hits,
+    trackInfo,
+    (hit) => ({ title: hit.trackName ?? "", artist: hit.artistName ?? "", durationSec: hit.duration }),
+    // Word timing over line timing over plain text.
+    (hit) => (hit.hasWordSync && hit.lyricsfile ? 2 : hit.syncedLyrics ? 1 : 0)
+  );
+}
+
+export function parseLRCLikeLyrics(text: string): {
   synced: TimedLine[] | null;
   unsynced: string[] | null;
 } {
@@ -56,17 +98,10 @@ export async function fetchLRCLIBLyrics(
       .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
       .join("&")}`;
 
-    const response = await fetch(finalURL, {
-      headers: {
-        "x-user-agent": `spicetify v${Spicetify.Config.version} (https://github.com/spicetify/cli)`,
-      },
-    });
+    const response = await fetch(finalURL, { headers: LRCLIB_HEADERS() });
 
-    if (!response.ok) {
-      return null;
-    }
-
-    const body = await response.json();
+    const body: LrclibRecord | null = response.ok ? await response.json() : await searchLRCLIB(trackInfo);
+    if (!body) return null;
     if (body?.instrumental) {
       const instrumentalLyrics = buildStaticLyrics(
         ["♪ Instrumental ♪"],
@@ -76,6 +111,15 @@ export async function fetchLRCLIBLyrics(
       if (!instrumentalLyrics) return null;
 
       return createProviderResult(instrumentalLyrics, "lrclib");
+    }
+
+    // Word timing first, from the Lyricsfile; a file that can't be read falls back to the lines.
+    if (body.hasWordSync && typeof body.lyricsfile === "string") {
+      const wordLines = ParseLyricsfile(body.lyricsfile, trackInfo.durationMs)?.wordLines;
+      const syllableLyrics = wordLines ? buildSyllableLyrics(wordLines, "lrclib", "LRCLIB") : null;
+      if (syllableLyrics) {
+        return createProviderResult(syllableLyrics, "lrclib");
+      }
     }
 
     if (typeof body?.syncedLyrics === "string") {

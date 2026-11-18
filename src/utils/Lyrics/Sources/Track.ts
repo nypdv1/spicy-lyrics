@@ -13,7 +13,9 @@ function buildTrackLyricsInfo(
   album: string,
   durationMs: number
 ): TrackLyricsInfo | null {
-  if (!id || !title || !artist || durationMs <= 0) {
+  // A local file may have no artist tag, and name it in the title instead ("Artist - Song").
+  const isLocalFile = uri.startsWith("spotify:local:");
+  if (!id || !title || (!artist && !isLocalFile) || durationMs <= 0) {
     return null;
   }
 
@@ -28,7 +30,9 @@ function buildTrackLyricsInfo(
 }
 
 export async function getTrackLyricsInfo(uri: string): Promise<TrackLyricsInfo | null> {
-  const id = uri.split(":")[2] ?? "";
+  // A local file's URI ("spotify:local:<artist>:<album>:<title>:<seconds>") has no id segment, and
+  // its artist and album parts are empty when untagged; the URI itself identifies it.
+  const id = uri.startsWith("spotify:local:") ? uri : (uri.split(":")[2] ?? "");
   if (!id) return null;
 
   if (!Spicetify.URI.isTrack(uri) && !uri.startsWith("spotify:local:")) {

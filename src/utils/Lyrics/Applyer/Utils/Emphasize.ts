@@ -90,7 +90,7 @@ export default function Emphasize(
   isBgWord: boolean = false,
   parts?: SyllablePart[],
   flameGroup: FlameGroup | null = null,
-  restartRanges?: Array<{ StartTime: number; EndTime: number }>
+  restartRanges?: Array<{ StartTime: number; EndTime: number; CueTime?: number }>
 ) {
   const Substractions = getSubstractions();
   const StartTime = ConvertTime(lead.StartTime) - Substractions.StartTime;
@@ -187,6 +187,7 @@ export default function Emphasize(
       ...(restartRanges ? { RestartRanges: restartRanges.map((range) => ({
         StartTime: ConvertTime(range.StartTime),
         EndTime: ConvertTime(range.EndTime),
+        ...(range.CueTime !== undefined ? { CueTime: ConvertTime(range.CueTime) } : {}),
       })) } : {}),
       ...mcont,
     });

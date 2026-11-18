@@ -26,6 +26,7 @@ import ApplyDynamicBackground, {
 import { isExperimentEnabled } from "./utils/experiments.ts";
 import "./components/DynamicBG/CanvasImmersive.ts";
 import "./components/DynamicBG/AnimatedArtwork.ts";
+import "./components/DynamicBG/PopupCanvas.ts";
 import "./components/DynamicBG/NpvCanvasBackground.ts";
 import {
   $alwaysShowInFullscreen,
@@ -117,6 +118,7 @@ import Logger from "./utils/Logger.ts";
 import Whentil from "./modules/Whentil.ts";
 import App from "./utils/app.ts";
 import { toCssFontFamily } from "./utils/cssFontFamily.ts";
+import { SyncCustomFontSize } from "./utils/customFontSize.ts";
 import { loadCoollabsFont } from "./utils/coollabsFonts.ts";
 import { initSession } from "./utils/SessionManager/index.ts";
 import { CheckForUpdates } from "./utils/version/CheckForUpdates.tsx";
@@ -137,6 +139,7 @@ function applyCustomFont(enabled = $customFontEnabled.get(), font = $customFont.
   } else {
     document.documentElement.style.removeProperty("--spicy-custom-font");
   }
+  SyncCustomFontSize(document);
 }
 
 function closeSettingsOwnedModalOnNavigation(data: { pathname: string }) {
@@ -617,6 +620,9 @@ async function main() {
   let isHandlingEscape = false;
   const handleEscapeKey = async () => {
     if (isHandlingEscape || IsPIP) return true;
+    // An open dropdown in the modal (a Select's list, the font picker) closes itself on
+    // Escape; this listener runs first, so it must not close the whole modal underneath.
+    if (PopupModal.isConnected && PopupModal.querySelector(":popover-open")) return false;
     if (PopupModal.isConnected && PopupModal.querySelector(".slmodal-settingsPanel, .slmodal-animatorPreview")) {
       PopupModal.hide();
       return true;

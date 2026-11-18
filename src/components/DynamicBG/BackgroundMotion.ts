@@ -53,6 +53,18 @@ const MIN_ENERGY_RANGE_DB = 6;
 /** Zoom added at full energy. */
 const SCALE_PER_ENERGY = 0.025;
 
+/** Beat-synced pulse constants. */
+const MIN_BEAT_CONFIDENCE = 0.3;
+const BEAT_DECAY = 4.5;
+const BEAT_ATTACK = 0.02;
+const BEAT_RELEASE = 0.18;
+const BEAT_RATE_BOOST = 2.1;
+const BEAT_SCALE_BOOST = 0.075;
+const BASE_SATURATION = 1.5;
+const BEAT_SATURATION_BOOST = 0.55;
+const BASE_WARP_INTENSITY = 1;
+const BEAT_WARP_BOOST = 0.35;
+
 /** Easing between playing and paused (time constant, seconds). */
 const PLAY_EASE = 0.6;
 /**
@@ -73,15 +85,29 @@ export class TrackMotion {
   private readonly envLoudness: Float32Array;
   private readonly sectionStart: Float64Array;
   private readonly sectionLoudness: Float32Array;
+  private readonly beatStart: Float64Array;
+  private readonly beatDuration: Float32Array;
+  private readonly beatConfidence: Float32Array;
   private readonly quietDb: number;
   private readonly loudDb: number;
 
   private envCursor = 0;
   private sectionCursor = 0;
+  private beatCursor = 0;
 
   constructor(data: AudioAnalysisData) {
     const segments = Array.isArray(data.segments) ? data.segments : [];
     const sections = Array.isArray(data.sections) ? data.sections : [];
+    const beats = Array.isArray(data.beats) ? data.beats : [];
+
+    this.beatStart = new Float64Array(beats.length);
+    this.beatDuration = new Float32Array(beats.length);
+    this.beatConfidence = new Float32Array(beats.length);
+    for (let i = 0; i < beats.length; i++) {
+      this.beatStart[i] = beats[i].start;
+      this.beatDuration[i] = beats[i].duration;
+      this.beatConfidence[i] = beats[i].confidence;
+    }
 
     this.envTime = new Float64Array(segments.length * 3);
     this.envLoudness = new Float32Array(segments.length * 3);
@@ -146,6 +172,21 @@ export class TrackMotion {
     this.sectionCursor = i;
     return this.sectionLoudness[i];
   }
+
+  beatPulseAt(t: number): number {
+    const starts = this.beatStart;
+    if (!starts.length || t < starts[0]) return 0;
+    let i = this.beatCursor;
+    if (i >= starts.length || starts[i] > t) i = 0;
+    while (i < starts.length - 1 && starts[i + 1] <= t) i++;
+    this.beatCursor = i;
+    const duration = this.beatDuration[i];
+    const confidence = this.beatConfidence[i];
+    if (duration <= 0 || confidence < MIN_BEAT_CONFIDENCE) return 0;
+    const progress = (t - starts[i]) / duration;
+    if (progress < 0 || progress >= 1) return 0;
+    return Math.exp(-BEAT_DECAY * progress) * confidence;
+  }
 }
 
 function weightedPercentile(values: [number, number][], p: number): number {
@@ -184,6 +225,8 @@ export interface MotionInput {
   reducedMotion: boolean;
   /** The playing track's model, or null when there's no analysis to follow. */
   track: TrackMotion | null;
+  /** Whether per-beat pulses are enabled. */
+  beatSync?: boolean;
 }
 
 const ease = (dt: number, tau: number) => 1 - Math.exp(-dt / tau);
@@ -193,10 +236,15 @@ export class MotionClock {
   time = 0;
   /** Zoom handed to Kawarp, 1 at rest. */
   scale = 1;
+  /** Color saturation handed to Kawarp. */
+  saturation = BASE_SATURATION;
+  /** Warp intensity handed to Kawarp. */
+  warpIntensity = BASE_WARP_INTENSITY;
   /** Current flow rate. The rest of the state below is public for probes only. */
   rate = RATE_UNANALYZED;
 
   energy = NEUTRAL_ENERGY;
+  beat = 0;
   /** 1 while playing with motion allowed, 0 paused or under reduced motion; eased. */
   play = 0;
   /** 1 while an analysis drives the motion, 0 without one; eased. */
@@ -207,24 +255,33 @@ export class MotionClock {
     if (Number.isFinite(time)) this.time = time;
   }
 
-  step({ dt: rawDt, position, playing, reducedMotion, track }: MotionInput) {
+  step({ dt: rawDt, position, playing, reducedMotion, track, beatSync = true }: MotionInput) {
     const dt = Math.min(Math.max(rawDt, 0), MAX_FRAME_STEP);
     // Reduced motion holds the background at the paused drift, as Kawarp's own clock did.
     this.play += ((playing && !reducedMotion ? 1 : 0) - this.play) * ease(dt, PLAY_EASE);
     this.follow += ((track ? 1 : 0) - this.follow) * ease(dt, FOLLOW_EASE);
 
     const target = track ? track.energyAt(position + ENERGY_LEAD) : NEUTRAL_ENERGY;
+    const rawPulse = beatSync && track ? track.beatPulseAt(position) : 0;
     if (dt > 0) {
       const tau = target > this.energy ? ENERGY_ATTACK : ENERGY_RELEASE;
       this.energy += (target - this.energy) * ease(dt, tau);
+      const beatTau = rawPulse > this.beat ? BEAT_ATTACK : BEAT_RELEASE;
+      this.beat += (rawPulse - this.beat) * ease(dt, beatTau);
     }
 
-    const musicRate = RATE_QUIET + (RATE_LOUD - RATE_QUIET) * this.energy;
+    const energyWeight = 0.35 + 0.65 * this.energy;
+    const beatRate = BEAT_RATE_BOOST * this.beat * energyWeight * this.follow;
+    const musicRate = RATE_QUIET + (RATE_LOUD - RATE_QUIET) * this.energy + beatRate;
     const playingRate = (RATE_UNANALYZED + (musicRate - RATE_UNANALYZED) * this.follow) * MOTION_INTENSITY;
     this.rate = PAUSED_RATE + (playingRate - PAUSED_RATE) * this.play;
     this.time += dt * this.rate;
 
-    this.scale = 1 + SCALE_PER_ENERGY * this.energy * MOTION_INTENSITY * this.play * this.follow;
+    const beatScale = BEAT_SCALE_BOOST * this.beat * energyWeight;
+    const activeBeat = this.beat * energyWeight * this.play * this.follow;
+    this.scale = 1 + (SCALE_PER_ENERGY * this.energy + beatScale) * MOTION_INTENSITY * this.play * this.follow;
+    this.saturation = BASE_SATURATION + BEAT_SATURATION_BOOST * activeBeat;
+    this.warpIntensity = BASE_WARP_INTENSITY + BEAT_WARP_BOOST * activeBeat;
     return this;
   }
 }

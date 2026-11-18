@@ -3,6 +3,8 @@ import Session from "../Global/Session.ts";
 import PageView, { PageContainer } from "../Pages/PageView.ts";
 import Fullscreen from "./Fullscreen.ts";
 import { NPVCardOwnsPage, DeRenderNPVCard, RequestNPVCardEvaluate } from "./NPVLyrics.ts";
+import { SyncNoLyricsLayout } from "../../utils/Lyrics/LyricsNotice.ts";
+import { AttachPopupShortcuts } from "./PopupShortcuts.ts";
 
 export let IsPIP = false;
 export let _IsPIP_after = false;
@@ -15,10 +17,12 @@ let currentPipWindow = null;
 let pipPageHideHandler: ((event: Event) => void) | null = null;
 
 // Smallest popup viewport the layout is built for: the NowBar (artwork +
-// metadata) plus room for a couple of lyric lines below it. Document PiP has no
-// min-size option, so the window is snapped back up instead.
-const PIP_MIN_WIDTH = 260;
-const PIP_MIN_HEIGHT = 180;
+// metadata) plus room for a couple of lyric lines below it. 260 × 180 was
+// technically usable, but the dock's controls, title, and lyrics all fought
+// for the same few pixels and made the Mini Player look broken. Document PiP
+// has no min-size option, so the window is snapped back up instead.
+const PIP_MIN_WIDTH = 320;
+const PIP_MIN_HEIGHT = 220;
 // Snap once the user lets go — resizing mid-drag fights the OS resize loop.
 const PIP_MIN_SIZE_SETTLE_MS = 200;
 let pipMinSizeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -237,8 +241,10 @@ const OpenPopupLyricsFlow = async () => {
     currentPipWindow = await docPiP.requestWindow({
       disallowReturnToOpener: true,
       preferInitialWindowPlacement: false,
-      width: 390,
-      height: 379,
+      // A landscape default reads like a Mini Player while leaving enough
+      // vertical room for lyrics above the dock. Users can still resize it.
+      width: 480,
+      height: 360,
     });
   } finally {
     docPiP.removeEventListener("enter", startGuardOnEnter);
@@ -344,12 +350,17 @@ const OpenPopupLyricsFlow = async () => {
   if (customFont) {
     currentPipWindow.document.documentElement.style.setProperty("--spicy-custom-font", customFont);
   }
+  const customFontAdjust = document.documentElement.style.getPropertyValue("--spicy-custom-font-adjust");
+  if (customFontAdjust) {
+    currentPipWindow.document.documentElement.style.setProperty("--spicy-custom-font-adjust", customFontAdjust);
+  }
 
   const pipWrapper = currentPipWindow.document.body.querySelector(".spicy-pip-wrapper") as HTMLElement;
 
   IsPIP = true;
 
   await PageView.Open(pipWrapper);
+  SyncNoLyricsLayout();
   if (!PageView.IsOpened || !pipWrapper.contains(PageContainer)) {
     // The open was refused or raced; don't leave a blank window claiming PiP.
     IsPIP = false;
@@ -359,6 +370,7 @@ const OpenPopupLyricsFlow = async () => {
     return;
   }
 
+  AttachPopupShortcuts(currentPipWindow);
   Fullscreen.Open(true, false);
 
   pipPageHideHandler = () => {

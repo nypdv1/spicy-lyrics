@@ -48,23 +48,99 @@
 
 ## v0.1.0.246
 
-- **Upstream sync & popup/settings polish**: Merged upstream `6.5.x` changes, including voice-detection word sync, Canvas Stage music video support, and popup mini player layout/sizing fixes.
+- **Unison lyrics & Profile Cards**: Added **Unison** (`Unison.ts`) as a lyrics source and replaced the iframe profile modal with a native **Profile Card** modal (`ProfileCardModal`) for community makers, along with docked credits and maker visibility controls.
 
 ## v0.1.0.245
 
-- **Custom font & stutter fixes**: Stabilized custom font picker controls and refined vocal stutter replay windows.
+- **Popup Mini Player, Canvas & Shortcuts**: Added **Popup Canvas** (`PopupCanvas`), keyboard **Popup Shortcuts**, below-cover player layout (`PlayerBelowCover`), and **PopupDock** / **Queue View** styling and behavior improvements.
 
 ## v0.1.0.244
 
-- **Lyrics & NowBar refinements**: Improved NowBar updates on song change and Smooth Scrolling layout performance.
+- **Lyricsfile, Local Files & Source Matching**: Added **Lyricsfile** and **LocalFileQuery** lyrics sources with improved **SearchMatch** fallback and `LrcRed` / `Lrclib` updates.
 
 ## v0.1.0.243
 
-- **Popup & rendering stability**: Preserved classic popup mini player layout and improved background/canvas handoff.
+- **Beat-Reactive Background & Custom Font Size**: Enhanced `BackgroundMotion` beat-sync reactivity across main and popup windows, updated `CanvasImmersive` / `ArtworkPlacement`, and added **Custom Font Size** with font specimen previews in the upstream settings picker.
 
 ## v0.1.0.242
 
-- **Initial `0.1.0.x` fork build**: Switched from `100.10.x-sync` to `0.1.0.x` versioning with worker deployment.
+- **Initial `0.1.0.x` fork build**: Switched from `100.10.x-sync` to `0.1.0.x` versioning with worker deployment and `6.5.0+` upstream sync.
+
+## v0.1.0.258
+
+- **Patch notes support for fork releases**: Updated the in-app Patch Notes dialog and links to point to `nypdv1/spicy-lyrics` and parse 4-part `0.1.0.x` versions.
+
+## v0.1.0.257
+
+- **Dynamic upstream version for API requests**: Fetches and caches the live upstream version from `api.spicylyrics.org/version` for `SpicyLyrics-Version` headers and query payloads while keeping fork update checks on `0.1.0.x`.
+
+## v0.1.0.256
+
+- **Upstream version header**: Sent the upstream Spicy Lyrics version on API and Edge requests instead of the fork build version.
+
+## v0.1.0.255
+
+- **Motion Blur Style selector**: Added **Smooth (Fast)** (GPU CSS blur) and **Directional** (vertical SVG streak blur) modes under Playback / Lyrics settings.
+
+## v0.1.0.254
+
+- **Smoother Scroll Motion Blur**: Switched back to GPU-accelerated CSS `filter: blur(...)` with an earlier, stronger velocity curve so all moving lines blur smoothly at high frame rates.
+
+## v0.1.0.253
+
+- **Vertical Directional Motion Blur**: Switched scroll motion blur to a 1D vertical `<feGaussianBlur>` streak so already-soft sung/upcoming lines also visibly blur during motion.
+
+## v0.1.0.252
+
+- **Stronger Scroll Motion Blur**: Increased scroll motion blur visibility across the lyrics list.
+
+## v0.1.0.251
+
+- **Longer Calm Bloom transitions**: Extended Calm Bloom Scrolling duration and gap-aware settle window.
+
+## v0.1.0.250
+
+- **Calm Bloom Scrolling refinement**: Tuned the Bloom scroll curve and gap-aware pacing so transitions don't cut off early.
+
+## v0.1.0.249
+
+- **Scroll Motion Blur**: Added lightweight velocity-based motion blur during Bloom and Smooth Scrolling, with toggles in Settings.
+
+## v0.1.0.248
+
+- **Smooth end-of-scroll settle**: Prevented premature scroll cancellation when moving between active lines.
+
+## v0.1.0.247
+
+- **Calm Bloom Scrolling**: Added a gentler, gap-aware bezier curve option for Bloom line transitions.
+
+## v0.1.0.246
+
+- **Unison lyrics & Profile Cards**: Added **Unison** (`Unison.ts`) as a lyrics source and replaced the iframe profile modal with a native **Profile Card** modal (`ProfileCardModal`) for community makers, along with docked credits and maker visibility controls.
+
+## v0.1.0.245
+
+- **Popup Mini Player, Canvas & Shortcuts**: Added **Popup Canvas** (`PopupCanvas`), keyboard **Popup Shortcuts**, below-cover player layout (`PlayerBelowCover`), and **PopupDock** / **Queue View** styling and behavior improvements.
+
+## v0.1.0.244
+
+- **Lyricsfile, Local Files & Source Matching**: Added **Lyricsfile** and **LocalFileQuery** lyrics sources with improved **SearchMatch** fallback and `LrcRed` / `Lrclib` updates.
+
+## v0.1.0.243
+
+- **Beat-Reactive Background & Custom Font Size**: Enhanced `BackgroundMotion` beat-sync reactivity across main and popup windows, updated `CanvasImmersive` / `ArtworkPlacement`, and added **Custom Font Size** with font specimen previews in the upstream settings picker.
+
+## v0.1.0.242
+
+- **Initial `0.1.0.x` fork build**: Switched from `100.10.x-sync` to `0.1.0.x` versioning with worker deployment and `6.5.0+` upstream sync.
+
+## v100.10.133-sync – v100.10.241-sync
+
+- **Upstream 6.5.0+ sync & word-sync**: Merged upstream `6.5.0`, added `lrc.red` lyrics source & model sync, and added Spotify voice-detection word-sync timing.
+- **Vocal stutter repair & replay**: Added vocal stutter word-sync repair, leading/suffix dash handling, and per-cue replay animations across simple and Bloom renderers.
+- **Canvas Stage & music videos**: Added Spicy Themes music video playback on the Canvas Stage, transparent background support, and smoother NowBar/Canvas handoffs.
+- **Settings & font picker**: Added selectable upstream settings layout with pinned subcategory navigation, previewable Google/coolLabs & system font picker, and adjustable Long Word Minimum threshold.
+- **Popup mini player & Smooth Scrolling**: Restored classic popup mini player layout and sizing, and reduced per-frame layout work in Smooth Scrolling.
 
 ## v100.10.133-sync – v100.10.241-sync
 

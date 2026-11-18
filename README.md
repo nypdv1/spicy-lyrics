@@ -40,7 +40,7 @@ Once the plugin is loaded, you can point it at the fork build server:
 6. Enter `fork.rmmreviv.al` as the **API Host**
 7. Enable **Use the same host for both API and Storage**
 8. Click **Save Branch**
-9. Click **Switch** beside `Fork` — Spicy Lyrics reloads on the fork branch
+9. Click **Switch** beside `Fork` - Spicy Lyrics reloads on the fork branch
 
 ---
 
@@ -50,12 +50,13 @@ This build is designed to **coexist with the official Spicy Lyrics release**. If
 
 ---
 
-> Built on the `dev` branch. Features here may be unstable, incomplete, or subject to change before reaching the official release (if ever 💀, lowkey, this is just my playground).
+> Features here may be unstable, incomplete, or subject to change before reaching the official release (if ever 💀, lowkey, this is just my playground).
 
 ## What's New
 
-## v0.1.0.257
+## v0.1.0.258
 
+- **Patch notes support**: Updated the in-app Patch Notes dialog and links to point to `nypdv1/spicy-lyrics` and parse `0.1.0.x` releases.
 - **Dynamic upstream version for API requests**: Fetches and caches the live upstream version from `api.spicylyrics.org/version` for `SpicyLyrics-Version` headers and query payloads while keeping fork update checks on `0.1.0.x`.
 - **Scroll Motion Blur**: Added scroll velocity motion blur across all moving lyric lines with a **Motion Blur Style** selector (**Smooth (Fast)** GPU blur vs **Directional** vertical streak blur).
 - **Calm Bloom Scrolling**: Added a gentler, gap-aware bezier curve option for Bloom line transitions so scrolling settles smoothly without abrupt stops.

@@ -1,34 +1,46 @@
 import React, { useEffect, useState } from "react";
-import { coerce, gt, lt, lte } from "semver";
 import { NoticeLink, showNotice } from "./NoticeDialog.tsx";
 
-const PATCH_NOTES_URL = "https://raw.githubusercontent.com/iPixelGalaxy/spicy-lyrics/dev/.change-notes/PATCH_NOTES.md";
-const PATCH_NOTES_PAGE_URL = "https://github.com/iPixelGalaxy/spicy-lyrics/blob/dev/.change-notes/PATCH_NOTES.md";
-const FEATURE_GUIDE_URL = "https://github.com/iPixelGalaxy/spicy-lyrics/blob/dev/.change-notes/FEATURE_CHANGES.md";
+const PATCH_NOTES_URL = "https://raw.githubusercontent.com/nypdv1/spicy-lyrics/main/.change-notes/PATCH_NOTES.md";
+const PATCH_NOTES_PAGE_URL = "https://github.com/nypdv1/spicy-lyrics/blob/main/.change-notes/PATCH_NOTES.md";
+const FEATURE_GUIDE_URL = "https://github.com/nypdv1/spicy-lyrics/blob/main/.change-notes/FEATURE_CHANGES.md";
 const FETCH_TIMEOUT_MS = 10_000;
 const DISCORD_URL = "https://discord.com/invite/uqgXU5wh8j";
 
 type PatchNote = { text: string; version: string; };
 
-function normalizeVersion(value: string) { return coerce(value.trim()); }
+function parseVersionParts(value: string): [number, number, number, number] | null {
+  const match = value.trim().match(/^v?(\d+)\.(\d+)\.(\d+)(?:\.(\d+))?(?:[-+].*)?$/i);
+  if (!match) return null;
+  return [Number(match[1]), Number(match[2]), Number(match[3]), Number(match[4] ?? 0)];
+}
+
+function compareVersions(a: [number, number, number, number], b: [number, number, number, number]): number {
+  for (let i = 0; i < 4; i++) {
+    if (a[i] !== b[i]) return a[i] > b[i] ? 1 : -1;
+  }
+  return 0;
+}
 
 function getPatchNotes(markdown: string, fromVersion: string, installedVersion: string): PatchNote[] {
-  const installed = normalizeVersion(installedVersion);
-  const from = normalizeVersion(fromVersion);
-  if (!installed || (from && !gt(installed, from))) return [];
+  const installed = parseVersionParts(installedVersion);
+  const from = parseVersionParts(fromVersion);
+  if (!installed || (from && compareVersions(installed, from) <= 0)) return [];
 
   const notes: PatchNote[] = [];
   let version: string | null = null;
   let currentNote: string[] | null = null;
   const finishNote = () => {
     if (!version || !currentNote) return;
-    const noteVersion = normalizeVersion(version);
-    if (noteVersion && lte(noteVersion, installed) && (!from || gt(noteVersion, from))) notes.push({ version, text: currentNote.join(" ").trim() });
+    const noteVersion = parseVersionParts(version);
+    if (noteVersion && compareVersions(noteVersion, installed) <= 0 && (!from || compareVersions(noteVersion, from) > 0)) {
+      notes.push({ version, text: currentNote.join(" ").trim() });
+    }
     currentNote = null;
   };
 
   for (const line of markdown.replace(/\r/g, "").split("\n")) {
-    const versionMatch = line.match(/^##\s+v?(\d+\.\d+\.\d+)\s*$/i);
+    const versionMatch = line.match(/^##\s+v?(\d+\.\d+\.\d+(?:\.\d+)?)\s*$/i);
     if (versionMatch) { finishNote(); version = versionMatch[1]; continue; }
     const noteMatch = line.match(/^\s*[-*]\s+(.+)$/);
     if (noteMatch) { finishNote(); currentNote = [noteMatch[1].trim()]; continue; }
@@ -55,12 +67,12 @@ function renderInlineMarkdown(text: string): React.ReactNode[] {
   return tokens;
 }
 
-function hasPixelEditionVersion(fromVersion: string): boolean { return /^100\.10\.\d+$/i.test(fromVersion.trim()); }
+function hasPixelEditionVersion(fromVersion: string): boolean { return /^(?:100\.10\.\d+|0\.1\.0\.\d+)$/i.test(fromVersion.trim()); }
 function needsWalkthrough(fromVersion: string): boolean { return !hasPixelEditionVersion(fromVersion); }
 function isDowngrade(fromVersion: string, installedVersion: string): boolean {
-  const from = normalizeVersion(fromVersion);
-  const installed = normalizeVersion(installedVersion);
-  return Boolean(from && installed && lt(installed, from));
+  const from = parseVersionParts(fromVersion);
+  const installed = parseVersionParts(installedVersion);
+  return Boolean(from && installed && compareVersions(installed, from) < 0);
 }
 
 function PatchNotes({ fromVersion, toVersion, style }: { fromVersion: string; toVersion: string; style?: React.CSSProperties }) {

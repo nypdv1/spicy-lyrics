@@ -1,3 +1,71 @@
+## v0.1.0.258
+
+- **Patch notes support for fork releases**: Updated the in-app Patch Notes dialog and links to point to `nypdv1/spicy-lyrics` and parse 4-part `0.1.0.x` versions.
+
+## v0.1.0.257
+
+- **Dynamic upstream version for API requests**: Fetches and caches the live upstream version from `api.spicylyrics.org/version` for `SpicyLyrics-Version` headers and query payloads while keeping fork update checks on `0.1.0.x`.
+
+## v0.1.0.256
+
+- **Upstream version header**: Sent the upstream Spicy Lyrics version on API and Edge requests instead of the fork build version.
+
+## v0.1.0.255
+
+- **Motion Blur Style selector**: Added **Smooth (Fast)** (GPU CSS blur) and **Directional** (vertical SVG streak blur) modes under Playback / Lyrics settings.
+
+## v0.1.0.254
+
+- **Smoother Scroll Motion Blur**: Switched back to GPU-accelerated CSS `filter: blur(...)` with an earlier, stronger velocity curve so all moving lines blur smoothly at high frame rates.
+
+## v0.1.0.253
+
+- **Vertical Directional Motion Blur**: Switched scroll motion blur to a 1D vertical `<feGaussianBlur>` streak so already-soft sung/upcoming lines also visibly blur during motion.
+
+## v0.1.0.252
+
+- **Stronger Scroll Motion Blur**: Increased scroll motion blur visibility across the lyrics list.
+
+## v0.1.0.251
+
+- **Longer Calm Bloom transitions**: Extended Calm Bloom Scrolling duration and gap-aware settle window.
+
+## v0.1.0.250
+
+- **Calm Bloom Scrolling refinement**: Tuned the Bloom scroll curve and gap-aware pacing so transitions don't cut off early.
+
+## v0.1.0.249
+
+- **Scroll Motion Blur**: Added lightweight velocity-based motion blur during Bloom and Smooth Scrolling, with toggles in Settings.
+
+## v0.1.0.248
+
+- **Smooth end-of-scroll settle**: Prevented premature scroll cancellation when moving between active lines.
+
+## v0.1.0.247
+
+- **Calm Bloom Scrolling**: Added a gentler, gap-aware bezier curve option for Bloom line transitions.
+
+## v0.1.0.246
+
+- **Upstream sync & popup/settings polish**: Merged upstream `6.5.x` changes, including voice-detection word sync, Canvas Stage music video support, and popup mini player layout/sizing fixes.
+
+## v0.1.0.245
+
+- **Custom font & stutter fixes**: Stabilized custom font picker controls and refined vocal stutter replay windows.
+
+## v0.1.0.244
+
+- **Lyrics & NowBar refinements**: Improved NowBar updates on song change and Smooth Scrolling layout performance.
+
+## v0.1.0.243
+
+- **Popup & rendering stability**: Preserved classic popup mini player layout and improved background/canvas handoff.
+
+## v0.1.0.242
+
+- **Initial `0.1.0.x` fork build**: Rebased fork onto `6.5.0+` with `0.1.0.x` versioning and worker deployment.
+
 ## v100.10.54
 
 - **Updated to be inline with 6.4.70**

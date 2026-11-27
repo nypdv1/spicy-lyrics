@@ -5,6 +5,16 @@
 > **This is an unofficial fork build of Spicy Lyrics**, — a derivative of [LyssLabs/lyssna-lyrics](https://github.com/LyssLabs/lyssna-lyrics) (pixel fork).
 > Install it if ur niche
 
+<div align="center">
+  <img src="https://fork.rmmreviv.al/previews/lyrics-demo.webp" alt="Spicy Lyrics — synced lyrics demo" width="640" />
+  <br>
+  <sub>
+    Demo settings — Font: <strong>Story Script</strong> (Google Fonts) · Renderer: <strong>Bloom</strong> ·
+    Background: <strong>Dynamic</strong> + Beat Sync · Scroll Motion Blur: <strong>Smooth</strong> ·
+    Calm Bloom Scroll · Syllable Merge: <strong>Steady</strong> · Experimental Word Sync · Lyrics size: 90%
+  </sub>
+</div>
+
 ---
 
 ## Installation
@@ -53,6 +63,30 @@ This build is designed to **coexist with the official Spicy Lyrics release**. If
 > Features here may be (are) unstable, incomplete, or subject to change ().
 
 ## What's New
+
+## v0.1.0.267
+
+- **Additional 1:1 performance optimizations**: Deduplicated cover blob fetches, moved NowBar heart updates to `LibraryAPI` events + 2 s backstop, aborted stale motion artwork probes on track skip, and culled hidden `.ScrollToActive` `backdrop-filter`.
+
+## v0.1.0.266
+
+- **Performance & lifecycle optimizations**: Reduced idle GPU/RAF work, fixed observer/listener leaks, prevented unnecessary popup prewarming outside PiP, and culled hidden backdrop-filter/will-change layers (visually 1:1).
+
+## v0.1.0.264
+
+- **Settings UX overhaul**: Added subcategory headings, sticky jump chips with scroll tracking, and indented nested child options across Settings tabs.
+
+## v0.1.0.262
+
+- **Faster Popup Lyrics background startup**: Pre-warms Canvas media and motion artwork verdicts on song change so switching into the popup mini player starts playback right away.
+
+## v0.1.0.261
+
+- **Canvas / Motion behind Popup Lyrics**: Added a setting to show darkened and blurred Canvas or motion artwork behind the mini player lyrics instead of Kawarp, inheriting your **Popup Cover Animation** preference.
+
+## v0.1.0.260
+
+- **Remove duplicate Fullscreen Volume Slider option**: Removed the redundant **Fullscreen Volume Slider** dropdown from Interface settings while keeping the **Volume Slider** artwork toggle.
 
 ## v0.1.0.259
 

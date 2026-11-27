@@ -1,3 +1,122 @@
+## v0.1.0.287
+
+- Cover Flow click fix: the drag handler captured the pointer on every press, swallowing clicks on the play/download/delete buttons (and covers). Capture now starts only mid-drag, and drags never begin on the actions row.
+
+## v0.1.0.286
+
+- The same layered shadow applied to all covers.
+
+## v0.1.0.285
+
+- Cover Flow shadows: layered soft drop shadow on the front cover only — side covers' shadows were skewing under the rotation.
+
+## v0.1.0.284
+
+- Cover Flow is now the default database view (a stored preference still wins).
+
+## v0.1.0.283
+
+- Cover Flow in the Lyrics Database: browse your TTML library as a cover-flow carousel — perspective-fanned covers with reflections, drag/wheel/arrow-key navigation, click to focus or play, play/download/delete on the focused track. List/flow toggle in the panel header.
+
+## v0.1.0.282
+
+- Settings layout transition: soft scale+fade when switching layouts; reduced-motion falls back to opacity only.
+
+## v0.1.0.281
+
+- Layout switcher placement: the classic panel's switch button moved next to the search bar (it wrapped onto its own row as a tab).
+
+## v0.1.0.280
+
+- Settings layout switcher: a ⇄ button in the new panel's header jumps to the classic layout; a matching control in the classic panel jumps forward.
+
+## v0.1.0.279
+
+- Preset safety: built-in Defaults preset (pinned at the top, restores stock settings, can't be deleted/shared/overwritten); two-tap confirmations on Apply, overwrite-on-save, Delete, and Import.
+
+## v0.1.0.278
+
+- Presets row alignment fix: the "Save current setup" row was stacked (button on its own line below the text) — all Presets rows now right-align their controls.
+
+## v0.1.0.277
+
+- Presets styling fix: the empty picker no longer collapses to a sliver (disabled "No presets" placeholder); the preset-name field gets proper input styling in the new layout.
+
+## v0.1.0.276
+
+- Settings Presets: save your whole settings panel as a named preset — Presets tab in the new layout, "Settings Presets" under Advanced → Manage in classic. Save, apply, delete, share via `SLP1:` codes, import with auto name-dedupe. Covers every persisted setting except the Musixmatch token.
+
+## v0.1.0.275
+
+- Credit rejoin fixes: credits return to their pinned spot on rebuild/song change instead of getting orphaned in flow; the empty pinned layer no longer leaves a phantom margin; docking self-heals when the footer is already in flow.
+
+## v0.1.0.274
+
+- Smoother credit rejoin: the footer glides between its pinned spot and its place under the last line (~500ms) instead of popping; the bottom mask fade transitions with it.
+
+## v0.1.0.273
+
+- Credits rejoin the lyrics (experiment): pinned credits leave their fixed bottom spot and move into the scroll flow when you reach the end of the lyrics.
+
+## v0.1.0.272
+
+- Bug fixes and polish.
+
+## v0.1.0.271
+
+- Bug fixes and polish.
+
+## v0.1.0.270
+
+- Bug fixes and polish.
+
+## v0.1.0.269
+
+- Bug fixes and polish.
+
+## v0.1.0.268
+
+- Bug fixes and polish.
+
+## v0.1.0.267
+
+- **Additional 1:1 performance optimizations**:
+  - Deduplicated `fetchCoverBlob` requests across `lpagebg` and `npvbg`.
+  - Replaced the 50 ms NowBar heart polling loop with `LibraryAPI` `update_item` events and `playback:songchange` (with a 2 s backstop).
+  - Re-checked `PlayingAlbumId()` in `MotionArtworkSource` after UPC/signing so skipped albums aren't probed.
+  - Disabled `backdrop-filter` on hidden `.ScrollToActive` and replaced `body:has(.Root:not(.global-nav))` in `Lyrics/main.css`.
+
+## v0.1.0.266
+
+- **Performance & lifecycle optimizations (visually 1:1)**:
+  - Unsubscribed suspended Kawarp instances and hidden/inactive `CanvasImmersive` / `NpvCanvasBackground` loops from `AnimationFrameLoop`, and skipped redundant 10 Hz `playback:progress` work.
+  - Scoped `PopupLyricsBg.prewarm()` to active PiP sessions, paused `PopupCanvas` when hidden/paused, and fixed negative-cache misses in `ArtistVisuals` and `UpstreamVersion`.
+  - Fixed `pinnedFooterObserver` and `metadataMarqueeObserver` leaks, deduplicated `NowBar` drag listeners, scoped `musicVideoObserver` away from lyrics DOM churn, removed permanent `will-change` on `.line` / `#SpicyLyricsPage`, and disabled `backdrop-filter` on hidden `.ViewSwitch`.
+
+## v0.1.0.265
+
+- **Settings jump chips polish**: Switched active chip tracking to `IntersectionObserver` with an end sentinel, added a `scrollend` jump lock, used `MutationObserver` for live chip visibility, and applied panel design tokens and `:focus-visible` rings.
+
+## v0.1.0.264
+
+- **Settings jump chips & nested child options**: Added sticky subcategory jump chips under the Settings tabs with active scroll tracking, and indented child options (`Animation Frame Rate`, `Early Scroll Time`, `Motion Blur Style`, `Keep Syllable Pace`, `Hide NPV Lyrics When No Lyrics Are Available`) under their parent toggles while keeping them searchable.
+
+## v0.1.0.263
+
+- **Settings subcategory headings**: Added subcategory groupings and headings across Appearance, Lyrics Display, and Interface settings tabs.
+
+## v0.1.0.262
+
+- **Faster Popup Lyrics background startup**: Pre-warms Canvas media and motion artwork verdicts on song change so switching into the popup mini player starts playback right away.
+
+## v0.1.0.261
+
+- **Canvas / Motion behind Popup Lyrics**: Added a setting to show darkened and blurred Canvas or motion artwork behind the mini player lyrics instead of Kawarp, inheriting your **Popup Cover Animation** preference.
+
+## v0.1.0.260
+
+- **Remove duplicate Fullscreen Volume Slider option**: Removed the redundant **Fullscreen Volume Slider** dropdown from Interface settings while keeping the **Volume Slider** artwork toggle.
+
 ## v0.1.0.259
 
 - **Grouped view controls hover fade**: Fixed the pill's icons disappearing immediately on hover-off while the empty pill lingered; the capsule and its icons now fade in and out together.
@@ -69,86 +188,6 @@
 ## v0.1.0.242
 
 - **Initial `0.1.0.x` fork build**: Switched from `100.10.x-sync` to `0.1.0.x` versioning with worker deployment and `6.5.0+` upstream sync.
-
-## v0.1.0.259
-
-- **Grouped view controls hover fade**: Fixed the pill's icons disappearing immediately on hover-off while the empty pill lingered; the capsule and its icons now fade in and out together.
-
-## v0.1.0.258
-
-- **Patch notes support for fork releases**: Updated the in-app Patch Notes dialog and links to point to `nypdv1/spicy-lyrics` and parse 4-part `0.1.0.x` versions.
-
-## v0.1.0.257
-
-- **Dynamic upstream version for API requests**: Fetches and caches the live upstream version from `api.spicylyrics.org/version` for `SpicyLyrics-Version` headers and query payloads while keeping fork update checks on `0.1.0.x`.
-
-## v0.1.0.256
-
-- **Upstream version header**: Sent the upstream Spicy Lyrics version on API and Edge requests instead of the fork build version.
-
-## v0.1.0.255
-
-- **Motion Blur Style selector**: Added **Smooth (Fast)** (GPU CSS blur) and **Directional** (vertical SVG streak blur) modes under Playback / Lyrics settings.
-
-## v0.1.0.254
-
-- **Smoother Scroll Motion Blur**: Switched back to GPU-accelerated CSS `filter: blur(...)` with an earlier, stronger velocity curve so all moving lines blur smoothly at high frame rates.
-
-## v0.1.0.253
-
-- **Vertical Directional Motion Blur**: Switched scroll motion blur to a 1D vertical `<feGaussianBlur>` streak so already-soft sung/upcoming lines also visibly blur during motion.
-
-## v0.1.0.252
-
-- **Stronger Scroll Motion Blur**: Increased scroll motion blur visibility across the lyrics list.
-
-## v0.1.0.251
-
-- **Longer Calm Bloom transitions**: Extended Calm Bloom Scrolling duration and gap-aware settle window.
-
-## v0.1.0.250
-
-- **Calm Bloom Scrolling refinement**: Tuned the Bloom scroll curve and gap-aware pacing so transitions don't cut off early.
-
-## v0.1.0.249
-
-- **Scroll Motion Blur**: Added lightweight velocity-based motion blur during Bloom and Smooth Scrolling, with toggles in Settings.
-
-## v0.1.0.248
-
-- **Smooth end-of-scroll settle**: Prevented premature scroll cancellation when moving between active lines.
-
-## v0.1.0.247
-
-- **Calm Bloom Scrolling**: Added a gentler, gap-aware bezier curve option for Bloom line transitions.
-
-## v0.1.0.246
-
-- **Unison lyrics & Profile Cards**: Added **Unison** (`Unison.ts`) as a lyrics source and replaced the iframe profile modal with a native **Profile Card** modal (`ProfileCardModal`) for community makers, along with docked credits and maker visibility controls.
-
-## v0.1.0.245
-
-- **Popup Mini Player, Canvas & Shortcuts**: Added **Popup Canvas** (`PopupCanvas`), keyboard **Popup Shortcuts**, below-cover player layout (`PlayerBelowCover`), and **PopupDock** / **Queue View** styling and behavior improvements.
-
-## v0.1.0.244
-
-- **Lyricsfile, Local Files & Source Matching**: Added **Lyricsfile** and **LocalFileQuery** lyrics sources with improved **SearchMatch** fallback and `LrcRed` / `Lrclib` updates.
-
-## v0.1.0.243
-
-- **Beat-Reactive Background & Custom Font Size**: Enhanced `BackgroundMotion` beat-sync reactivity across main and popup windows, updated `CanvasImmersive` / `ArtworkPlacement`, and added **Custom Font Size** with font specimen previews in the upstream settings picker.
-
-## v0.1.0.242
-
-- **Initial `0.1.0.x` fork build**: Switched from `100.10.x-sync` to `0.1.0.x` versioning with worker deployment and `6.5.0+` upstream sync.
-
-## v100.10.133-sync – v100.10.241-sync
-
-- **Upstream 6.5.0+ sync & word-sync**: Merged upstream `6.5.0`, added `lrc.red` lyrics source & model sync, and added Spotify voice-detection word-sync timing.
-- **Vocal stutter repair & replay**: Added vocal stutter word-sync repair, leading/suffix dash handling, and per-cue replay animations across simple and Bloom renderers.
-- **Canvas Stage & music videos**: Added Spicy Themes music video playback on the Canvas Stage, transparent background support, and smoother NowBar/Canvas handoffs.
-- **Settings & font picker**: Added selectable upstream settings layout with pinned subcategory navigation, previewable Google/coolLabs & system font picker, and adjustable Long Word Minimum threshold.
-- **Popup mini player & Smooth Scrolling**: Restored classic popup mini player layout and sizing, and reduced per-frame layout work in Smooth Scrolling.
 
 ## v100.10.133-sync – v100.10.241-sync
 

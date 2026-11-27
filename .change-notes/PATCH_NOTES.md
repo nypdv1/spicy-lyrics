@@ -1,3 +1,17 @@
+## v0.1.0.290
+
+- Re-delivery lyrics fallback: when no source has this track id (re-released songs get new ids), the ISRC is searched in Spotify's own catalogue and matching releases get their lyrics — verified by ISRC or title/artist/length before use.
+- Perf: resting unsung words now settle their springs exactly before being skipped.
+
+## v0.1.0.289
+
+- Perf: resting unsung words skip their per-frame work; frame-invariant settings are read once per frame; background-line checks skip songs without any.
+- Perf: NowBar timeline pauses its 250ms tick while its window is hidden.
+
+## v0.1.0.288
+
+- Bug fixes and polish.
+
 ## v0.1.0.287
 
 - Cover Flow click fix: the drag handler captured the pointer on every press, swallowing clicks on the play/download/delete buttons (and covers). Capture now starts only mid-drag, and drags never begin on the actions row.

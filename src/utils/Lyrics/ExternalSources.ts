@@ -90,6 +90,11 @@ const WORD_SCORE = 3;
  */
 export const LOCAL_FILE_SOURCES: ReadonlySet<LyricsSourceProviderId> = new Set(["musixmatch", "unison", "lrcred", "lrclib", "netease"]);
 
+// Sources that look the song up by its Spotify track id — the ones a re-delivery
+// blinds. The rest match on title/artist/length or their own ISRC search, so a
+// different release's id adds nothing for them.
+const ID_KEYED_SOURCES: ReadonlySet<LyricsSourceProviderId> = new Set(["spicy", "musixmatch", "apple", "spotify"]);
+
 type FetchLyricsFromProvidersOptions = {
   onFirstLyrics?: (lyrics: any) => void;
 };
@@ -116,13 +121,34 @@ export async function fetchLyricsFromProviders(
 
   const isLocalFile = uri.startsWith("spotify:local:");
   const result = await requestProviders(trackInfo, order, isLocalFile, options);
-  if (result?.lyrics || isLocalFile) return result;
+  if (isLocalFile) return result;
 
   // A re-delivered song gets a new track id, and the id-keyed sources then find
-  // nothing. An ISRC names the recording itself, so another release carrying it
-  // is the same song and its lyrics fit. Only when the first pass found nothing.
-  const alternate = await requestAlternateRelease(trackInfo, order, options);
-  return alternate?.lyrics ? alternate : result;
+  // nothing even when another release of the same recording has it. An ISRC
+  // names the recording itself, so a release carrying it is the same song and
+  // its lyrics fit. Run whenever an id-keyed source was enabled but a non-id
+  // winner (or nothing) answered.
+  const idKeyedOrder = order.filter((provider) => ID_KEYED_SOURCES.has(provider));
+  const winningProvider = result?.lyrics?.fetchProvider as LyricsSourceProviderId | undefined;
+  if (
+    idKeyedOrder.length === 0 ||
+    (typeof winningProvider === "string" && ID_KEYED_SOURCES.has(winningProvider))
+  ) {
+    return result;
+  }
+  const alternate = await requestAlternateRelease(trackInfo, idKeyedOrder, options);
+  if (!alternate?.lyrics || !result?.lyrics) return alternate?.lyrics ? alternate : result;
+  // Both passes have lyrics: the better tier wins, ties go to the provider
+  // earlier in the configured order — the same rule as within one pass.
+  const alternateProvider = alternate.lyrics.fetchProvider as LyricsSourceProviderId | undefined;
+  const alternateScore = getLyricsTypeScore(alternate.lyrics);
+  const resultScore = getLyricsTypeScore(result.lyrics);
+  const preferAlternate =
+    alternateScore > resultScore ||
+    (alternateScore === resultScore &&
+      typeof alternateProvider === "string" &&
+      order.indexOf(alternateProvider) < order.indexOf(winningProvider));
+  return preferAlternate ? alternate : result;
 }
 
 const ISRC_SEARCH_TIMEOUT_MS = 6000;
